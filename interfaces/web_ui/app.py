@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -307,6 +307,56 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         """Write a value to the memory bus."""
         memory_bus.write(scope, key, body.value)
         return MemoryWriteResponse(scope=scope, key=key)
+
+    @app.websocket("/api/runs/{run_id}/ws")
+    async def websocket_run_status(websocket: WebSocket, run_id: str):
+        """Stream run status updates via WebSocket."""
+        import asyncio
+
+        await websocket.accept()
+        record = run_executor.get(run_id)
+        if record is None:
+            await websocket.close(code=1008, reason="Run not found")
+            return
+
+        queue: asyncio.Queue[RunRecord] = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+
+        def on_update(r: RunRecord):
+            try:
+                asyncio.run_coroutine_threadsafe(queue.put(r), loop)
+            except Exception:
+                pass
+
+        run_executor.subscribe(run_id, on_update)
+        try:
+            await websocket.send_json(
+                {
+                    "run_id": run_id,
+                    "status": record.status.value,
+                    "artifacts": record.artifacts,
+                }
+            )
+            if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
+                await websocket.close()
+                return
+            while True:
+                record = await queue.get()
+                payload = {
+                    "run_id": run_id,
+                    "status": record.status.value,
+                    "artifacts": record.artifacts,
+                }
+                if record.error:
+                    payload["error"] = record.error
+                await websocket.send_json(payload)
+                if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
+                    await websocket.close()
+                    break
+        except WebSocketDisconnect:
+            pass
+        finally:
+            run_executor.unsubscribe(run_id, on_update)
 
     return app
 

@@ -137,7 +137,7 @@ class ToolProtocol(Protocol):
 
 
 class BaseTool(ABC):
-    """Abstract base for all tools."""
+    """Abstract base for all synchronous tools."""
 
     def __init__(self, tool_id: str, schema: ToolSchema, risk_level: RiskLevel) -> None:
         self._tool_id = tool_id
@@ -168,24 +168,83 @@ class BaseTool(ABC):
         return True, ""
 
 
+@runtime_checkable
+class AsyncToolProtocol(Protocol):
+    """Protocol for async-capable tools."""
+
+    @property
+    def tool_id(self) -> str:
+        ...
+
+    @property
+    def schema(self) -> ToolSchema:
+        ...
+
+    @property
+    def risk_level(self) -> RiskLevel:
+        ...
+
+    async def ainvoke(self, params: dict[str, Any], context: ToolContext) -> ToolResult:
+        ...
+
+
+class AsyncBaseTool(ABC):
+    """Abstract base for all async tools."""
+
+    def __init__(self, tool_id: str, schema: ToolSchema, risk_level: RiskLevel) -> None:
+        self._tool_id = tool_id
+        self._schema = schema
+        self._risk_level = risk_level
+
+    @property
+    def tool_id(self) -> str:
+        return self._tool_id
+
+    @property
+    def schema(self) -> ToolSchema:
+        return self._schema
+
+    @property
+    def risk_level(self) -> RiskLevel:
+        return self._risk_level
+
+    @abstractmethod
+    async def ainvoke(self, params: dict[str, Any], context: ToolContext) -> ToolResult:
+        raise NotImplementedError
+
+    def validate_params(self, params: dict[str, Any]) -> tuple[bool, str]:
+        """Validate parameters against schema."""
+        for name, param_schema in self._schema.parameters.items():
+            if param_schema.required and name not in params:
+                return False, f"Missing required parameter: {name}"
+        return True, ""
+
+
 class ToolRegistry:
-    """Registry for tool discovery and lookup."""
+    """Registry for tool discovery and lookup. Supports both sync and async tools."""
 
     def __init__(self) -> None:
-        self._tools: dict[str, BaseTool] = {}
+        self._tools: dict[str, BaseTool | AsyncBaseTool] = {}
 
-    def register(self, tool: BaseTool) -> None:
+    def register(self, tool: BaseTool | AsyncBaseTool) -> None:
         if tool.tool_id in self._tools:
             raise ValueError(f"Tool '{tool.tool_id}' already registered.")
         self._tools[tool.tool_id] = tool
 
-    def get(self, tool_id: str) -> BaseTool:
+    def get(self, tool_id: str) -> BaseTool | AsyncBaseTool:
         if tool_id not in self._tools:
             raise KeyError(f"Tool '{tool_id}' not found.")
         return self._tools[tool_id]
 
+    def get_async(self, tool_id: str) -> AsyncBaseTool:
+        """Retrieve a tool and assert it supports async invocation."""
+        tool = self.get(tool_id)
+        if not isinstance(tool, AsyncBaseTool):
+            raise TypeError(f"Tool '{tool_id}' is not an async tool.")
+        return tool
+
     def list_tools(self) -> list[str]:
         return sorted(self._tools.keys())
 
-    def discover_by_prefix(self, prefix: str) -> list[BaseTool]:
+    def discover_by_prefix(self, prefix: str) -> list[BaseTool | AsyncBaseTool]:
         return [tool for tid, tool in self._tools.items() if tid.startswith(prefix)]

@@ -6,6 +6,7 @@ Supports persistent sessions for multi-step workflows.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import re
 import urllib.error
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from core.errors import ToolSafetyError
-from core.tool_protocol import BaseTool, ParamSchema, ReturnSchema, RiskLevel, ToolContext, ToolResult, ToolSchema
+from core.tool_protocol import AsyncBaseTool, BaseTool, ParamSchema, ReturnSchema, RiskLevel, ToolContext, ToolResult, ToolSchema
 from tools.browser.session import BrowserSessionManager
 
 
@@ -385,3 +386,159 @@ class BrowserTool(BaseTool):
                 text = re.sub(r"<[^>]+>", "", match.group(2)).strip()
                 links.append({"text": text, "href": href})
             return ToolResult(success=True, data=links, metadata={"backend": "urllib_fallback", "count": len(links)})
+
+
+class AsyncBrowserTool(AsyncBaseTool):
+    """Async browser automation tool.
+
+    Uses :mod:`playwright.async_api` for transient mode and wraps the
+    synchronous :class:`BrowserSessionManager` in ``asyncio.to_thread()``
+    for session mode.
+    """
+
+    PLAYWRIGHT_OPS = {"screenshot", "click", "fill", "evaluate", "create_session", "close_session"}
+
+    def __init__(self, repo_root: str | Path = ".") -> None:
+        self.repo_root = Path(repo_root).resolve()
+        schema = ToolSchema(
+            description="Async browser automation for web page interaction. Supports persistent sessions for multi-step workflows.",
+            parameters={
+                "operation": ParamSchema(
+                    type="string",
+                    description="Operation to perform",
+                    enum=["navigate", "get_text", "get_links", "screenshot", "click", "fill", "evaluate", "create_session", "close_session"],
+                    required=True,
+                ),
+                "url": ParamSchema(type="string", description="URL to navigate to", required=False),
+                "selector": ParamSchema(type="string", description="CSS selector for click/fill/get_text", required=False),
+                "value": ParamSchema(type="string", description="Value to fill into input", required=False),
+                "script": ParamSchema(type="string", description="JavaScript to evaluate", required=False),
+                "save_path": ParamSchema(type="string", description="Relative path to save screenshot (omit for base64)", required=False),
+                "timeout": ParamSchema(type="integer", description="Timeout in seconds", default=30, required=False),
+                "session_id": ParamSchema(type="string", description="Session ID for persistent browser context", required=False),
+            },
+            returns=ReturnSchema(type="object", description="Operation result"),
+        )
+        super().__init__("browser.async", schema, RiskLevel.HIGH)
+
+    async def ainvoke(self, params: dict[str, Any], context: ToolContext) -> ToolResult:
+        valid, err = self.validate_params(params)
+        if not valid:
+            return ToolResult(success=False, error=err)
+
+        operation = params.get("operation")
+
+        if not context.network_allowed:
+            return ToolResult(success=False, error="Network access is not allowed by policy.")
+
+        try:
+            if operation == "create_session":
+                return await asyncio.to_thread(self._create_session_sync)
+            if operation == "close_session":
+                session_id = params.get("session_id")
+                return await asyncio.to_thread(self._close_session_sync, session_id)
+
+            if operation in ("navigate", "get_text", "get_links", "screenshot", "click", "fill", "evaluate"):
+                session_id = params.get("session_id")
+                if session_id:
+                    # Session mode — wrap sync calls in thread
+                    return await asyncio.to_thread(self._sync_invoke, operation, params, context)
+                # Transient mode — use async playwright
+                return await self._async_transient_invoke(operation, params, context)
+        except ToolSafetyError as exc:
+            return ToolResult(success=False, error=str(exc))
+
+        return ToolResult(success=False, error=f"Unknown operation: {operation}")
+
+    def _create_session_sync(self) -> ToolResult:
+        manager = BrowserSessionManager()
+        sid = manager.create_session()
+        return ToolResult(success=True, data={"session_id": sid}, metadata={"backend": "playwright", "action": "session_created"})
+
+    def _close_session_sync(self, session_id: str | None) -> ToolResult:
+        if not session_id:
+            return ToolResult(success=False, error="Parameter 'session_id' is required for close_session.")
+        manager = BrowserSessionManager()
+        manager.close_session(session_id)
+        return ToolResult(success=True, data={"session_id": session_id}, metadata={"backend": "playwright", "action": "session_closed"})
+
+    def _sync_invoke(self, operation: str, params: dict[str, Any], context: ToolContext) -> ToolResult:
+        """Delegate to sync BrowserTool for session-mode operations."""
+        sync_tool = BrowserTool(self.repo_root)
+        return sync_tool.invoke(params, context)
+
+    async def _async_transient_invoke(self, operation: str, params: dict[str, Any], context: ToolContext) -> ToolResult:
+        """Use playwright.async_api for transient (non-session) operations."""
+        from playwright.async_api import async_playwright
+
+        url = params.get("url", "")
+        timeout = params.get("timeout", 30)
+        selector = params.get("selector")
+        save_path = params.get("save_path")
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            try:
+                page = await browser.new_page()
+                if url:
+                    await page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+
+                if operation == "navigate":
+                    return ToolResult(
+                        success=True,
+                        data={"title": await page.title(), "status": None, "url": page.url},
+                        metadata={"backend": "playwright.async"},
+                    )
+                if operation == "get_text":
+                    if selector:
+                        text = await page.locator(selector).first.inner_text(timeout=timeout * 1000)
+                    else:
+                        text = await page.locator("body").inner_text(timeout=timeout * 1000)
+                    return ToolResult(success=True, data=text, metadata={"backend": "playwright.async"})
+                if operation == "get_links":
+                    links = await page.locator("a").all()
+                    results = []
+                    for link in links:
+                        href = await link.get_attribute("href") or ""
+                        text = (await link.inner_text()).strip()
+                        if href:
+                            results.append({"text": text, "href": href})
+                    return ToolResult(success=True, data=results, metadata={"backend": "playwright.async", "count": len(results)})
+                if operation == "screenshot":
+                    target = BrowserTool(self.repo_root)._resolve_save_path(save_path)
+                    if target:
+                        await page.screenshot(path=str(target), full_page=True)
+                        return ToolResult(
+                            success=True,
+                            data=str(target.relative_to(self.repo_root)),
+                            metadata={"backend": "playwright.async", "format": "png", "saved": True},
+                        )
+                    else:
+                        png_bytes = await page.screenshot(full_page=True)
+                        b64 = base64.b64encode(png_bytes).decode("ascii")
+                        return ToolResult(
+                            success=True,
+                            data=b64,
+                            metadata={"backend": "playwright.async", "format": "png", "saved": False, "encoding": "base64"},
+                        )
+                if operation == "click":
+                    if not selector:
+                        return ToolResult(success=False, error="Parameter 'selector' is required for click.")
+                    await page.locator(selector).first.click(timeout=timeout * 1000)
+                    return ToolResult(success=True, data={"clicked": selector}, metadata={"backend": "playwright.async"})
+                if operation == "fill":
+                    if not selector:
+                        return ToolResult(success=False, error="Parameter 'selector' is required for fill.")
+                    value = params.get("value", "")
+                    await page.locator(selector).first.fill(value, timeout=timeout * 1000)
+                    return ToolResult(success=True, data={"filled": selector}, metadata={"backend": "playwright.async"})
+                if operation == "evaluate":
+                    script = params.get("script", "")
+                    if not script:
+                        return ToolResult(success=False, error="Parameter 'script' is required for evaluate.")
+                    result = await page.evaluate(script)
+                    return ToolResult(success=True, data=result, metadata={"backend": "playwright.async"})
+            finally:
+                await browser.close()
+
+        return ToolResult(success=False, error=f"Unknown operation: {operation}")

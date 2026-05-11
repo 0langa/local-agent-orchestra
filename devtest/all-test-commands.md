@@ -107,6 +107,7 @@ pytest tests/test_multimodal.py -v
 pytest tests/test_federation.py -v
 pytest tests/test_federation_transport.py -v
 pytest tests/test_run_executor.py -v
+pytest tests/test_tool_protocol.py -v
 pytest tests/test_desktop_ui.py -v
 ```
 

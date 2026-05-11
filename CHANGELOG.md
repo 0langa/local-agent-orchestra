@@ -2,6 +2,16 @@
 
 ## 2026-05-10
 
+### Approach B Completion — Async Tool Protocol & WebSocket Streaming
+- **Async tool protocol**: Added `AsyncToolProtocol` and `AsyncBaseTool` to `core/tool_protocol.py`. `ToolRegistry` now supports mixed sync/async tool registration with `get_async()` helper.
+- **Async browser tool**: Added `AsyncBrowserTool` in `tools/browser/__init__.py` using `playwright.async_api` for transient mode and `asyncio.to_thread()` for session mode.
+- **Async MCP tool**: Added `AsyncMCPTool` in `tools/mcp/tool_adapter.py` that delegates sync MCP client calls to a thread pool via `asyncio.get_event_loop().run_in_executor()`.
+- **WebSocket streaming**: Added `GET /api/runs/{id}/ws` WebSocket endpoints to both API server and Web UI. Bridges sync `RunExecutor` notifications to async WebSocket handlers via `asyncio.Queue`. Closes cleanly for already-completed runs.
+- **RunExecutor unsubscribe**: Added `unsubscribe()` method to support WebSocket cleanup on disconnect.
+- **Tests**: Added `tests/test_tool_protocol.py` (11 tests) and WebSocket tests in `test_api_server.py`/`test_web_ui.py`. Total suite: **418 passed, 2 skipped**.
+
+## 2026-05-10
+
 ### Phase 6 Full Implementation (Approach B)
 - **MCP integration**: Added `MCPConnectionPool` for persistent connections. Fixed client lifecycle bug where `register_mcp_tools()` disconnected clients after registration, leaving tools with stale references.
 - **Browser tool**: Added `BrowserSessionManager` for persistent browser contexts. New operations `create_session` and `close_session` enable multi-step workflows (navigate → click → fill) without launching a new browser per operation.

@@ -72,6 +72,7 @@ switch ($Mode) {
             "tests/test_web_ui.py",
             "tests/test_api_server.py",
             "tests/test_run_executor.py",
+            "tests/test_tool_protocol.py",
             "tests/test_federation_transport.py"
         ))
         Invoke-TestSet -Label "broad (memory suite)" -PytestArgs ($baseArgs + @("tests/memory/"))

@@ -257,6 +257,43 @@ class TestRunStreaming:
         assert response.status_code == 404
 
 
+class TestRunWebSocket:
+    def test_websocket_run_not_found(self, client: TestClient) -> None:
+        from starlette.websockets import WebSocketDisconnect
+
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect("/api/runs/nonexistent_run_12345/ws") as ws:
+                ws.receive_json()
+
+    def test_websocket_receives_status_updates(self, client: TestClient) -> None:
+        import threading
+        import time
+        from core.run_executor import RunExecutor
+
+        # Use the existing singleton instance that the app factory captured.
+        executor = RunExecutor()
+
+        started = threading.Event()
+
+        def _slow_task():
+            started.set()
+            time.sleep(0.5)
+            return "done"
+
+        run_id = executor.submit(_slow_task)
+        started.wait(timeout=2.0)
+
+        with client.websocket_connect(f"/api/runs/{run_id}/ws") as ws:
+            msg1 = ws.receive_json()
+            assert msg1["run_id"] == run_id
+            assert msg1["status"] in ("pending", "running")
+
+            msg2 = ws.receive_json()
+            assert msg2["run_id"] == run_id
+            assert msg2["status"] == "completed"
+            assert msg2["artifacts"] == []
+
+
 class TestMetrics:
     def test_metrics_endpoint(self, client: TestClient) -> None:
         response = client.get("/api/metrics")

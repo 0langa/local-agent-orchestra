@@ -130,6 +130,14 @@ class RunExecutor:
             if run_id in self._subscribers:
                 self._subscribers[run_id].append(callback)
 
+    def unsubscribe(self, run_id: str, callback: Callable[[RunRecord], None]) -> None:
+        with self._run_lock:
+            if run_id in self._subscribers:
+                try:
+                    self._subscribers[run_id].remove(callback)
+                except ValueError:
+                    pass
+
     def _notify(self, run_id: str) -> None:
         with self._run_lock:
             record = self._runs.get(run_id)
