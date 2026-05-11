@@ -14,6 +14,7 @@
 - Rewrote `devtest/` scripts (`run-devtest.ps1`, `ai_test.ps1`, `all-test-commands.md`) to reflect current root-project test structure.
 - Updated `Agent-Team/docs/` internal references from `python -m ai_team` → `agentheim`.
 - Full test suite: **372 passed, 1 skipped**. Architecture check: PASSED.
+- Fixed CI workflow `.github/workflows/architecture.yml` to use `pip install -e ".[dev]"` ensuring all dependencies and the package itself are installed.
 
 ## 2026-05-10
 

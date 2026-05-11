@@ -58,3 +58,9 @@ Thumbs.db
 *.zip
 cov_err.txt
 cov_report.txt
+
+# Playwright MCP artifacts
+.playwright-mcp/
+*.png
+*.jpg
+*.jpeg
