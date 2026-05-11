@@ -1,133 +1,133 @@
-# Contributing to Agentwerk
+# Contributing to Agentheim
 
-## Before You Start
+Thanks for your interest in contributing! This guide covers everything you need to get started.
 
-### 1. Read the Roadmap
-This project is governed by a strict architecture roadmap in `docs/roadmap/`. Every contributor must understand:
-
-- **00_PROJECT_DOCTRINE.md** — The 7 Immutable Laws (supreme authority)
-- **06_PHASED_DEVELOPMENT_PLAN.md** — Which phase we're in and what's unlocked
-- **02_CORE_ARCHITECTURE_PRINCIPLES.md** — Directory structure and boundary rules
-- **05_REPOSITORY_BOUNDARIES.md** — Subsystem ownership
-
-### 2. Context Preamble (Required)
-
-When starting work with an AI agent, paste this preamble:
-
-```markdown
-## OPERATING CONTEXT
-**Project:** Agentwerk
-**Current Phase:** [see 01-phase-lock.md]
-**My Subsystem:** [your assigned directory]
-**Task:** [description]
-
-### Laws Check
-- [ ] No provider-specific logic in core/
-- [ ] No workflow-specific logic in core/
-- [ ] All tool calls through policy engine
-- [ ] Event-sourced, no mutable state
-- [ ] Local-first, privacy-respecting
-- [ ] Safety by default
-- [ ] Progressive disclosure preserved
-```
-
-### 3. Run Architecture Checks
+## Quick Start
 
 ```bash
-# Before committing
-python scripts/roadmap-check.py --phase [CURRENT_PHASE]
+# 1. Clone the repo
+git clone https://github.com/0langa/agentheim.git
+cd agentheim
 
-# In CI (blocks merge on failure)
-python scripts/roadmap-check.py --ci --phase [CURRENT_PHASE]
+# 2. Install dependencies
+pip install -e .
+
+# 3. Run the test suite
+$env:PYTHONPATH="."; pytest tests\ -q        # Windows
+PYTHONPATH="." pytest tests/ -q             # Linux/Mac
+
+# 4. Run the architecture check
+python scripts/roadmap-check.py --phase 6
 ```
 
-## Development Workflow
+## Development Setup
 
-### Phase-Locked Development
-We use strict phase gates. Check `docs/roadmap/06_PHASED_DEVELOPMENT_PLAN.md` for the current phase.
+### Requirements
+- Python 3.12+
+- Git
+- (Optional) Playwright for browser tool tests: `playwright install chromium`
 
-**Rules:**
-- Only implement subsystems unlocked for the current phase
-- Do NOT implement Phase 6 (RESERVED) systems
-- Do NOT modify locked subsystems without Architecture Lead approval
+### Install in editable mode
+```bash
+pip install -e .
+```
 
-### Subsystem Ownership
-Every directory has a primary owner. See `docs/roadmap/05_REPOSITORY_BOUNDARIES.md`.
+### Running tests
+```bash
+# Full suite
+$env:PYTHONPATH="."; pytest tests\ -v
 
-**Rules:**
-- You may modify files within your assigned subsystem
-- You may NOT modify files in another subsystem without owner approval
-- You may NOT modify `docs/roadmap/` without Architecture Lead approval
+# Specific module
+$env:PYTHONPATH="."; pytest tests\test_api_server.py -v
 
-### Cross-Boundary Changes
-If your change touches multiple subsystems:
+# With coverage
+$env:PYTHONPATH="."; pytest tests\ --cov=core --cov=tools --cov=workflows
+```
 
-1. Create an RFC in `docs/rfc/` describing the change and cross-boundary impact
-2. Get Architecture Lead review
-3. Get approval from ALL affected subsystem owners
-4. Implement in a feature branch
-5. All integration tests must pass
-6. Architecture Lead performs final merge
+### Running the CLI locally
+```bash
+python -m ai_team doctor
+python -m ai_team ping-models
+python -m ai_team inspect --repo .
+```
+
+## Project Structure
+
+```
+core/           # Generic runtime engine — provider/workflow/tool agnostic
+providers/      # Lazy-loaded provider adapters
+workflows/      # Workflow packs (coding, research, documents, ...)
+tools/          # Mediated tools with policy gating
+memory/         # Three-tier memory system
+interfaces/     # CLI, TUI, Web UI, API server, Desktop UI
+presets/        # Beginner-friendly preset definitions
+tests/          # Full test suite
+docs/roadmap/   # Architecture roadmap
+```
+
+**Key rule:** `core/` knows no provider, model, workflow, or tool names. Everything concrete lives in its own subsystem.
+
+## How to Contribute
+
+### 1. Pick an issue
+- Check [open issues](https://github.com/0langa/agentheim/issues) for `good first issue` or `help wanted`
+- Or propose a new feature via an issue first
+
+### 2. Create a branch
+```bash
+git checkout -b feature/your-feature-name
+```
+
+### 3. Make your changes
+- Follow existing code style (type hints, docstrings for public methods)
+- Add tests for new code
+- Keep changes focused — one concern per PR
+
+### 4. Run checks before submitting
+```bash
+# Tests must pass
+$env:PYTHONPATH="."; pytest tests\ -q
+
+# Architecture check must pass
+python scripts/roadmap-check.py --phase 6 --ci
+```
+
+### 5. Submit a PR
+- Fill out the PR template
+- Link related issues
+- Keep the description focused on *what* and *why*
 
 ## Code Standards
 
-### Architecture Invariants
-- Core runtime is provider-agnostic, workflow-agnostic, tool-agnostic
-- All tool calls go through `tools.base.ToolProtocol`
-- All provider access goes through `providers.base.ProviderProtocol`
-- All workflow execution goes through `workflows.base.Workflow`
-- All runs produce full artifact sets in `runs/<run-id>/`
-- All events are append-only in the ledger
+- **Type hints** required for all public methods
+- **Docstrings** for all public APIs
+- **Tests** for all new functionality
+- **No hardcoded secrets** — use env vars or config files
+- **No provider/workflow/tool names in `core/`** — use protocols and registries
 
-### Testing
-- Unit tests: >80% coverage for all new code
-- Integration tests for all cross-subsystem interactions
-- Run `pytest` before submitting PR
-- Run `python scripts/roadmap-check.py` before submitting PR
+## Testing Guidelines
 
-### Documentation
-- Docstrings for all public methods
-- Update relevant docs in `docs/` for user-facing changes
-- Add CHANGELOG entry for all changes
-
-### Commit Messages
-```
-[subsystem] Brief description
-
-- What changed
-- Why it changed
-- Which phase gate it advances (if any)
-
-Refs: #issue-number
-```
-
-## Pull Request Checklist
-
-- [ ] Roadmap check passes: `python scripts/roadmap-check.py --ci`
-- [ ] Tests pass: `pytest`
-- [ ] No architectural law violations
-- [ ] Only unlocked subsystems modified
-- [ ] Docs updated for user-facing changes
-- [ ] CHANGELOG entry added
-- [ ] Subsystem owner approval (if applicable)
-- [ ] Architecture Lead approval (for cross-boundary changes)
+| Test Type | Location | Coverage Target |
+|-----------|----------|----------------|
+| Unit tests | `tests/core/`, `tests/memory/` | >80% for new code |
+| Tool tests | `tests/test_*_tool.py` | All operations covered |
+| Integration | `tests/test_api_server.py`, `tests/test_web_ui.py` | Critical paths |
+| Smoke tests | `tests/smoke/` | End-to-end workflow execution |
 
 ## Getting Help
 
-- Architecture questions: Open an issue with `[ARCH]` prefix
-- Phase advancement: Contact Architecture Lead
-- Subsystem ownership: See `docs/roadmap/05_REPOSITORY_BOUNDARIES.md`
-- Security concerns: Open an issue with `[SECURITY]` prefix
+- **General questions:** Open a [discussion](https://github.com/0langa/agentheim/discussions) (if enabled) or an issue with `[QUESTION]` prefix
+- **Bug reports:** Use the bug report template
+- **Security issues:** See [SECURITY.md](SECURITY.md) — do NOT open public issues
 
-## Enforcement
+## Architecture Resources
 
-Violations are classified by level:
+If you want to understand the system deeply:
 
-| Level | Name | Action |
-|-------|------|--------|
-| 1 | Style | Auto-corrected |
-| 2 | Boundary | Requires review before merge |
-| 3 | Architecture | Blocks merge, triggers review |
-| 4 | Constitutional | Immediate revert, swarm notification |
+- [`docs/roadmap/00_PROJECT_DOCTRINE.md`](docs/roadmap/00_PROJECT_DOCTRINE.md) — Core principles and laws
+- [`docs/roadmap/02_CORE_ARCHITECTURE_PRINCIPLES.md`](docs/roadmap/02_CORE_ARCHITECTURE_PRINCIPLES.md) — Structure and boundaries
+- [`docs/roadmap/06_PHASED_DEVELOPMENT_PLAN.md`](docs/roadmap/06_PHASED_DEVELOPMENT_PLAN.md) — Current phase and unlocked subsystems
 
-The CI pipeline enforces these automatically via `scripts/roadmap-check.py --ci`.
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
