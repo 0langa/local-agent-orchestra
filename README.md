@@ -3,6 +3,7 @@
 [![Tests](https://img.shields.io/badge/tests-692%20passing-brightgreen)](https://github.com/0langa/agentheim/actions)
 [![Phase](https://img.shields.io/badge/phase-7%20production_hardening-blue)](docs/roadmap/06_PHASED_DEVELOPMENT_PLAN.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-unified-blue)](docs/README.md)
 
 **A local-first, preset-driven AI automation platform.**
 
@@ -25,6 +26,25 @@ Agentheim lets you run multi-agent workflows entirely on your own machine. Your 
 | **Command Assistant** | Parses natural language → generates safe shell commands |
 
 All workflows run through the same core engine: a **generic, provider-agnostic orchestration runtime** with event-sourced ledgers, policy-gated tools, and capability-based model resolution.
+
+---
+
+## 📚 Documentation
+
+Full documentation is available in the [`docs/`](docs/README.md) directory:
+
+| Document | Description |
+|----------|-------------|
+| [User Guide](docs/USER_GUIDE.md) | Install, configure, run presets |
+| [Architecture](docs/ARCHITECTURE.md) | System design, modules, boundaries |
+| [API Reference](docs/API_REFERENCE.md) | REST API, WebSocket, SDK usage |
+| [Contributing](docs/CONTRIBUTING.md) | Setup, standards, PR workflow |
+| [Safety & Security](docs/SAFETY.md) | Privacy modes, approval gates, vulnerabilities |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and fixes |
+| [Development & Testing](docs/DEV_TESTING.md) | Test commands and runner reference |
+| [Changelog](docs/CHANGELOG.md) | Release history |
+| [AICtx Integration Plan](docs/AICTX_INTEGRATION_PLAN.md) | Planned full integration path for AICtx |
+| [Roadmap](docs/roadmap/) | Architecture specification (design docs) |
 
 ---
 
@@ -118,7 +138,8 @@ agentheim/
 
 ## 📄 Documentation
 
-- [CLI Runbook](Agent-Team/docs/CLI_RUNBOOK.md)
+- [Docs Index](docs/README.md)
+- [AICtx Integration Plan](docs/AICTX_INTEGRATION_PLAN.md)
 - [Architecture Principles](docs/roadmap/02_CORE_ARCHITECTURE_PRINCIPLES.md)
 - [Safety Model](docs/roadmap/18_SAFETY_AND_PERMISSION_MODEL.md)
 - [Phased Development Plan](docs/roadmap/06_PHASED_DEVELOPMENT_PLAN.md)

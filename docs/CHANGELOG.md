@@ -38,6 +38,14 @@
 - **Async browser tool**: Added `AsyncBrowserTool` in `tools/browser/__init__.py` using `playwright.async_api` for transient mode and `asyncio.to_thread()` for session mode.
 - **Async MCP tool**: Added `AsyncMCPTool` in `tools/mcp/tool_adapter.py` that delegates sync MCP client calls to a thread pool via `asyncio.get_event_loop().run_in_executor()`.
 - **WebSocket streaming**: Added `GET /api/runs/{id}/ws` WebSocket endpoints to both API server and Web UI. Bridges sync `RunExecutor` notifications to async WebSocket handlers via `asyncio.Queue`. Closes cleanly for already-completed runs.
+
+## 2026-05-12
+
+### Docs Unification + AICtx Planning
+- Consolidated user-facing docs under `docs/`, removed duplicated legacy doc paths, and kept GitHub root surfaces (`README.md`, `CONTRIBUTING.md`) as pointers into the new structure.
+- Added `docs/AICTX_INTEGRATION_PLAN.md` with milestone-based AICtx absorption plan, backlog slices, deliverables, and test gates.
+- Corrected stale operational docs around CLI entrypoints, API auth/tool behavior, privacy-mode naming, ledger examples, and local verification commands.
+- Updated `devtest/all-test-commands.md` and `docs/DEV_TESTING.md` with repo-local CLI smoke commands and a Markdown-link smoke check for the new docs layout.
 - **RunExecutor unsubscribe**: Added `unsubscribe()` method to support WebSocket cleanup on disconnect.
 - **Tests**: Added `tests/test_tool_protocol.py` (11 tests) and WebSocket tests in `test_api_server.py`/`test_web_ui.py`. Total suite: **418 passed, 2 skipped**.
 

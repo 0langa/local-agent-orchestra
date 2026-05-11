@@ -1,6 +1,8 @@
 # Contributing to Agentheim
 
-Thanks for your interest in contributing! This guide covers everything you need to get started.
+> **Full contribution guide is at [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).**
+
+This file provides quick-start instructions. For the complete guide — including phase-locked development, cross-boundary changes, subsystem ownership, and architecture checks — see the documentation directory.
 
 ## Quick Start
 
@@ -13,91 +15,31 @@ cd agentheim
 pip install -e .
 
 # 3. Run the test suite
-$env:PYTHONPATH="."; pytest tests\ -q        # Windows
+pytest tests\ -q        # Windows
 PYTHONPATH="." pytest tests/ -q             # Linux/Mac
 
 # 4. Run the architecture check
-python scripts/roadmap-check.py --phase 6
+python scripts/roadmap-check.py --phase 7
 ```
 
-## Development Setup
+## Documentation
 
-### Requirements
-- Python 3.12+
-- Git
-- (Optional) Playwright for browser tool tests: `playwright install chromium`
+All project documentation is in the [`docs/`](docs/README.md) directory:
 
-### Install in editable mode
-```bash
-pip install -e .
-```
+| Document | Description |
+|----------|-------------|
+| [Contributing Guide](docs/CONTRIBUTING.md) | Full development setup, standards, and governance |
+| [Architecture](docs/ARCHITECTURE.md) | System design, module overview, boundary rules |
+| [Development & Testing](docs/DEV_TESTING.md) | Complete test command reference |
+| [Roadmap](docs/roadmap/) | Architecture specification (design docs) |
 
-### Running tests
-```bash
-# Full suite
-pytest tests\ -v
+## Key Rules
 
-# Specific module
-pytest tests\test_api_server.py -v
-
-# With coverage
-pytest tests\ --cov=core --cov=tools --cov=workflows
-```
-
-### Running the CLI locally
-```bash
-agentheim doctor
-agentheim ping-models
-agentheim inspect --repo .
-```
-
-## Project Structure
-
-```
-core/           # Generic runtime engine — provider/workflow/tool agnostic
-providers/      # Lazy-loaded provider adapters
-workflows/      # Workflow packs (coding, research, documents, ...)
-tools/          # Mediated tools with policy gating
-memory/         # Three-tier memory system
-interfaces/     # CLI, TUI, Web UI, API server, Desktop UI
-presets/        # Beginner-friendly preset definitions
-tests/          # Full test suite
-docs/roadmap/   # Architecture roadmap
-```
-
-**Key rule:** `core/` knows no provider, model, workflow, or tool names. Everything concrete lives in its own subsystem.
-
-## How to Contribute
-
-### 1. Pick an issue
-- Check [open issues](https://github.com/0langa/agentheim/issues) for `good first issue` or `help wanted`
-- Or propose a new feature via an issue first
-
-### 2. Create a branch
-```bash
-git checkout -b feature/your-feature-name
-```
-
-### 3. Make your changes
-- Follow existing code style (type hints, docstrings for public methods)
-- Add tests for new code
-- Keep changes focused — one concern per PR
-
-### 4. Run checks before submitting
-```bash
-# Tests must pass
-pytest tests\ -q
-
-# Architecture check must pass
-python scripts/roadmap-check.py --phase 6 --ci
-```
-
-### 5. Submit a PR
-- Fill out the PR template
-- Link related issues
-- Keep the description focused on *what* and *why*
-
-## Code Standards
+- `core/` knows no provider, model, workflow, or tool names
+- All tool calls go through the policy engine
+- All runs produce append-only event ledgers
+- Safety is the default state
+- Run `python scripts/roadmap-check.py --phase 7 --ci` before submitting
 
 - **Type hints** required for all public methods
 - **Docstrings** for all public APIs

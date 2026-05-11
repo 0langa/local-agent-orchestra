@@ -64,3 +64,6 @@ cov_report.txt
 *.png
 *.jpg
 *.jpeg
+
+# Old/stale documentation
+old-docs/

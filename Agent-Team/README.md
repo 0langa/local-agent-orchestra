@@ -58,7 +58,9 @@ Blocked runs remain resumable from the ledger.
 
 ## Documentation
 
-- `docs/CLI_RUNBOOK.md`
-- `docs/ARCHITECTURE.md`
-- `docs/SAFETY.md`
-- `docs/TROUBLESHOOTING.md`
+Full documentation is in the project-level [`docs/`](../docs/README.md) directory:
+
+- [User Guide](../docs/USER_GUIDE.md) — Install, configure, CLI reference, presets
+- [Architecture](../docs/ARCHITECTURE.md) — System design and module overview
+- [Safety & Security](../docs/SAFETY.md) — Privacy modes and approval gates
+- [Troubleshooting](../docs/TROUBLESHOOTING.md) — Common issues and fixes
