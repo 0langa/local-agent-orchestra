@@ -58,55 +58,47 @@ Integrate AICtx into Agentheim so that:
 
 ## Milestone Plan
 
-## M0 Architecture Freeze
+## M0 Architecture Freeze ✅
 
 ### Goal
 
 Define the integration contract before code movement begins.
 
-### Backlog
+### Status ✅ RESOLVED
 
-- Write an ADR defining canonical runtime ownership and subsystem boundaries.
-- Decide the canonical transient artifact location (`.ai-team/` vs `.aictx/`).
-- Define compatibility guarantees for `AGENTS.md`, `docs/AIprojectcontext/**`, and `context.lock.json`.
-- Define deprecation policy for the standalone AICtx CLI.
-- Record integration risks, ownership, and success criteria.
+All M0 items are decided. See `docs/adr/ADR-001-aictx-integration-contract.md`.
 
-### Additional M0 Backlog Items (from AICtx v1 state analysis)
+### Decisions (executive summary)
 
-- **Decide AICtx source namespace**: `agentheim.vendor.aictx` (preserved history subtree) vs slice-by-slice manual import. Prefer subtree merge for `git log` continuity.
-- **Define lockfile schema versioning strategy**: AICtx `context.lock.json` schema is v1.0. Agentheim must either adopt v1.0 directly or wrap it in a versioned envelope. Decide:
-  - Option A: Adopt v1.0 schema as-is (fastest, backward-compatible)
-  - Option B: Wrap in `agentheim-ctx.lock.json` with envelope versioning (cleaner long-term)
-- **Map AICtx provider interface to Agentheim**: AICtx has its own `llm/base.py` (`ModelProvider`, `ChatRequest`, `ChatResponse`). Agentheim has `providers/base.py` (`ModelProvider`, `ModelRequest`, `ModelResponse`). These are structurally similar but not identical. Decide:
-  - M7 scope: adapt AICtx to Agentheim provider interface
-  - Pre-M7: AICtx keeps its own provider abstraction behind `ContextOps` (adapter layer)
-- **Plan test migration**: AICtx has ~95 tests with 7 adversarial repo fixtures (`git_repos.py`). Decide:
-  - Import fixtures and tests into Agentheim `tests/vendor/aictx/`
-  - Run as-is during M1-M2; adapt to Agentheim conventions by M3
-- **Define CLI namespace**: `agentheim ctx <subcommand>` for AICtx operations. Map:
-  - `aictx scan` → `agentheim ctx scan`
-  - `aictx run` → `agentheim ctx run`
-  - `aictx verify` → `agentheim ctx verify`
-  - `aictx public-docs` → `agentheim ctx public-docs`
-  - `aictx snapshot` → `agentheim ctx snapshot`
-  - `aictx oci` → `agentheim ctx oci`
-  - Keep `aictx` as legacy alias during M1-M9
-- **Define verification composition model**: AICtx `verify` is hash-based lockfile verification (deterministic). Agentheim `PolicyEngine` is runtime safety verification. They are orthogonal — compose, not merge. AICtx verify runs at context-use time; PolicyEngine runs at tool-invocation time.
+| Decision | Outcome |
+|----------|---------|
+| ADR | `docs/adr/ADR-001-aictx-integration-contract.md` — approved |
+| Transient artifact location | `.ai-team/` (canonical already). `.aictx/` supported during M6 migration only. |
+| AICtx source namespace | `agentheim.vendor.aictx` via filtered-history subtree merge |
+| Lockfile schema versioning | **Option A**: adopt `context.lock.json` v1.0 as-is. No envelope wrapper. |
+| Provider interface strategy | Pre-M7: AICtx keeps its own `llm/base.py` behind `ContextOps`. M7: adapter layer routes through Agentheim `providers/base.py`. |
+| Test migration path | Tests in `tests/vendor/aictx/` with fixtures. Run as-is M1-M2; adapt by M3. |
+| CLI namespace | `agentheim ctx <subcommand>`. Standalone `aictx` CLI is thin wrapper during M1-M9; deprecated after M9. |
+| Verification composition | AICtx `verify` (hash-based lockfile) and Agentheim `PolicyEngine` (runtime safety) are orthogonal. Both emit to Agentheim ledger. |
+| Compatibility guarantees | `AGENTS.md`, `docs/AIprojectcontext/**`, `context.lock.json` v1.0, `.aictxignore`, patch-first writes preserved until explicit milestone change. |
+| Deprecation policy | Standalone CLI → M9; `.aictx/runs/` → M6; AICtx provider → M9; legacy CLI → M9 |
+| Risk | Duplicate `ModelProvider` name collision must be handled before M7. Subtree merge size. |
 
 ### Deliverables
 
-- Approved ADR
-- target module map
-- compatibility contract
-- deprecation policy
-- definition of done for “fully integrated”
+- ✅ ADR-001 written — `docs/adr/ADR-001-aictx-integration-contract.md`
+- ✅ All decisions recorded in ADR
+- ✅ Integration plan updated with resolved outcomes
+- ✅ Module map updated: `agentheim/vendor/aictx/`
+- ✅ Compatibility contract: see ADR-001
+- ✅ Deprecation policy: see ADR-001
+- ✅ Verification composition model defined
 
 ### Test Gates
 
-- Architecture review sign-off
-- explicit decision on transient state ownership
-- explicit decision on whether standalone `aictx` remains as a compatibility CLI
+- ✅ ADR-001 approved
+- ✅ Transient state ownership: `.ai-team/` remains canonical
+- ✅ Standalone CLI: kept as thin wrapper, deprecated after M9
 
 ---
 
@@ -225,6 +217,10 @@ Make the integrated context system usable from Agentheim surfaces.
 - Add a matching preset.
 - Add CLI/API/web entrypoints for context operations.
 - Emit Agentheim ledgers and artifacts around context runs.
+- **Implement CLI namespace**: Add `agentheim ctx` Typer subcommand group in `interfaces/cli/cli.py`. Delegate to `ContextOps` implementation.
+- **Dependency management**: AICtx runtime deps (typer, rich, pydantic, pathspec) are already in Agentheim or compatible. Add `pathspec>=0.12.0` to Agentheim deps. OCI extra (`oci>=2.120.0`) becomes optional Agentheim extra `[oci]`.
+- **Preserve standalone CLI**: Keep `aictx` entry point as thin wrapper around `agentheim ctx` during M1-M9. Deprecate after M9.
+- **AGENTS.md generation integration**: AICtx `agents_md.py` generates `AGENTS.md`. Agentheim root `AGENTS.md` already exists. Decide: overwrite, merge, or append? Prefer merge — AICtx preserves unmanaged sections.
 
 ### Deliverables
 
@@ -363,6 +359,9 @@ Adopt AICtx remote execution as an optional Agentheim backend, not as a separate
 - Keep patch-first semantics.
 - Surface OCI readiness checks through Agentheim diagnostics.
 - Rehydrate remote results into local ledgers and artifacts.
+- **Adopt existing AICtx OCI modules directly**: AICtx has fully built OCI infrastructure (config, doctor, snapshot, object_storage, bundle, remote_job, runtime, cleanup, worker). Most are production-ready stubs. Import as-is; add integration tests when credentials available.
+- **OCI readiness diagnostics**: `agentheim ctx oci doctor` maps to `OCIDoctorReport`. Expose through `agentheim doctor` too.
+- **Snapshot artifacts → Agentheim ArtifactStore**: AICtx snapshot zip files map to `ArtifactSpec` schema.
 
 ### Deliverables
 
@@ -480,26 +479,3 @@ The integration is complete only when all of the following are true:
 - optional remote execution features are Agentheim capabilities, not a parallel platform
 
 > **Current state (May 2026):** AICtx is v1-complete. All roadmap phases (0–8) are green. ~95+ unit tests pass. 7 adversarial repo fixtures exist. Lockfile schema is v1.0. OCI infrastructure is fully built (snapshot, object storage, remote job, worker, cleanup). The only remaining production steps are live OCI credential injection in CI and cross-platform install-matrix proofing. This means the integration target is stable — AICtx is not under active development, it is ready for absorption.
-
-### Additional M3 Backlog Items
-
-- **Implement CLI namespace**: Add `agentheim ctx` Typer subcommand group in `interfaces/cli/cli.py`. Delegate to `ContextOps` implementation.
-- **Dependency management**: AICtx runtime deps (typer, rich, pydantic, pathspec) are already in Agentheim or compatible. Add `pathspec>=0.12.0` to Agentheim deps. OCI extra (`oci>=2.120.0`) becomes optional Agentheim extra `[oci]`.
-- **Preserve standalone CLI**: Keep `aictx` entry point as thin wrapper around `agentheim ctx` during M1-M9. Deprecate after M9.
-- **AGENTS.md generation integration**: AICtx `agents_md.py` generates `AGENTS.md`. Agentheim root `AGENTS.md` already exists. Decide: overwrite, merge, or append? Prefer merge — AICtx preserves unmanaged sections.
-
-### Additional M8 Backlog Items
-
-- **Adopt existing AICtx OCI modules directly**: AICtx has fully built (not stubbed):
-  - `oci/config.py` — OCI config loading + validation
-  - `oci/doctor.py` — Local readiness check (SDK, config, profile, compartment, model, region)
-  - `oci/snapshot.py` — deterministic snapshot creation, 10K-file/500MiB/12-level hard caps
-  - `oci/object_storage.py` — upload/download with multipart + retries + checksum
-  - `oci/bundle.py` — result bundle creation + verification + corruption detection
-  - `oci/remote_job.py` — Data Science Job submission, polling, cancellation
-  - `oci/runtime.py` — runtime budgeting + cost estimation
-  - `oci/cleanup.py` — safe local + OCI cleanup with dry-run gates
-  - `oci/worker.py` — remote worker entry point
-  - **Most are production-ready stubs** (structural code + error handling, but untested against live OCI). Import as-is; add integration tests when OCI credentials available.
-- **OCI readiness → Agentheim diagnostics**: `agentheim ctx oci doctor` maps to existing `OCIDoctorReport`. Expose through `agentheim doctor` command too.
-- **Snapshot artifacts → Agentheim ArtifactStore**: AICtx snapshot zip files map to Agentheim `ArtifactSpec` schema. Store in Agentheim runtime artifacts dir.
