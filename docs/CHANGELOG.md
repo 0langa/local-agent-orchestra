@@ -485,3 +485,15 @@
   - `python scripts/roadmap-check.py --phase 7 --ci` passed,
   - `devtest` phase7/broad/full modes passed,
   - final `pytest -q` passed with **692 passed, 3 skipped**.
+
+## [unreleased] AICtx Integration (M2.5–M9)
+
+- **M2.5**: Expanded `ContextOps` ABC with `init()`, `clean()`, `run_pipeline()`, `public_docs_update()`. Enriched `WriteReport` with timing/entropy/run_report.
+- **M3**: Added `agentheim ctx` CLI (8 commands), `/api/ctx/*` API routes, `context-maintainer` workflow pack + preset, `ContextRunLedger` helper, 9 new `EventType`s.
+- **M4**: Made coding/docs/research workflows context-aware via AICtx pipeline. `WorkflowRunner` gained `stale_context_check` param and `context_fresh`/`context_stale` step conditions.
+- **M5**: Added public-docs impact preflight to docs-maintenance workflow. Review-first update path — patches generated to artifact store, never auto-applied.
+- **M6**: Migrated transient paths from `.aictx/runs/` → `.ai-team/runs/`. Created `LegacyAictxReader` for backward compatibility.
+- **M7**: Built `AgentheimToAictxAdapter` bridging Agentheim `ModelProvider` ↔ AICtx `ModelProvider`. Replaced `providers/oci_genai.py` stub with bridge to AICtx OCI provider.
+- **M8**: Added `agentheim ctx oci <doctor|snapshot|bundle>` commands. `agentheim doctor --oci` and `/api/health/oci` endpoint. `ArtifactStore.produce_snapshot()` method.
+- **M9**: Removed legacy `build_context_pack` fallback from all workflows. Deprecated `ContextPacker`/`ContextManifest`/`build_context_pack` in `core.public_api` (emits `DeprecationWarning`). Final docs sweep.
+- Validation: `pytest -q` passed with **760 passed, 3 skipped** (audited by external validation run).

@@ -9,6 +9,8 @@ import pytest
 
 from agentheim.context_ops import CleanResult, ContextPlan, GeneratedContext
 from agentheim.context_ops_impl import AictxContextOps
+from agentheim.vendor.aictx.models.inventory import FileEntry, RepositoryInventory
+from agentheim.vendor.aictx.verify.verifier import determine_changed_source_paths
 
 
 class TestWriteUsesAiTeamRuns:
@@ -93,3 +95,69 @@ class TestCleanIgnoresAictxRuns:
         assert not ai_run.exists()
         assert result.removed_count == 1
         assert result.removed_paths == ["ai-run"]
+
+
+class TestRuntimeArtifactsExcludedFromChanged:
+    """AH-AUDIT-002: .ai-team and other runtime artifacts must not poison changed-file detection."""
+
+    def _inventory(self, files: list[FileEntry]) -> RepositoryInventory:
+        return RepositoryInventory(
+            repo_root=".",
+            branch="main",
+            head_commit="abc123",
+            dirty_state=False,
+            git_status={"is_dirty": False, "tracked_files": [], "untracked_files": [], "modified_files": [], "deleted_files": [], "renamed_files": []},
+            files=files,
+        )
+
+    def _entry(self, path: str, sha256: str = "abc123", **kwargs: object) -> FileEntry:
+        return FileEntry(
+            path=path,
+            kind="source",
+            size_bytes=1,
+            sha256=sha256,
+            is_source=True,
+            **kwargs,
+        )
+
+    def test_ai_team_files_excluded(self) -> None:
+        inventory = self._inventory(
+            files=[
+                self._entry("src/main.py"),
+                self._entry(".ai-team/runs/inspect/repo_snapshot.json"),
+                self._entry(".ai-team/memory/state.json"),
+            ],
+        )
+        changed = determine_changed_source_paths(inventory, lock=None)
+        assert changed == ["src/main.py"]
+
+    def test_aictx_files_excluded(self) -> None:
+        inventory = self._inventory(
+            files=[
+                self._entry("src/main.py"),
+                self._entry(".aictx/runs/2024-01-01/context.json"),
+            ],
+        )
+        changed = determine_changed_source_paths(inventory, lock=None)
+        assert changed == ["src/main.py"]
+
+    def test_pytest_cache_and_coverage_excluded(self) -> None:
+        inventory = self._inventory(
+            files=[
+                self._entry("src/main.py"),
+                self._entry(".pytest_cache/v/cache/nodeids"),
+                self._entry(".coverage"),
+            ],
+        )
+        changed = determine_changed_source_paths(inventory, lock=None)
+        assert changed == ["src/main.py"]
+
+    def test_normal_source_included(self) -> None:
+        inventory = self._inventory(
+            files=[
+                self._entry("src/main.py"),
+                self._entry("tests/test_main.py"),
+            ],
+        )
+        changed = determine_changed_source_paths(inventory, lock=None)
+        assert sorted(changed) == ["src/main.py", "tests/test_main.py"]

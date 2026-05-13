@@ -51,6 +51,52 @@ class TestBrowserToolPolicy:
         assert "Missing required parameter" in result.error
 
 
+class TestBrowserToolUrlSchemeEnforcement:
+    """URL scheme and host blocking per AH-AUDIT-001."""
+
+    @pytest.mark.parametrize("bad_url", [
+        "file:///etc/passwd",
+        "file://C:/Windows/System32/drivers/etc/hosts",
+        "ftp://example.com/file.txt",
+        "data:text/html,<script>alert(1)</script>",
+        "javascript:alert(1)",
+    ])
+    def test_blocked_schemes(self, bad_url: str) -> None:
+        tool = BrowserTool()
+        ctx = ToolContext(network_allowed=True)
+        result = tool.invoke({"operation": "navigate", "url": bad_url, "timeout": 10}, ctx)
+        assert result.success is False
+        assert "scheme" in result.error.lower() or "not in allowed schemes" in result.error.lower()
+
+    def test_http_allowed(self) -> None:
+        tool = BrowserTool()
+        ctx = ToolContext(network_allowed=True)
+        with patch.object(tool, "_navigate_http_fallback", return_value=ToolResult(success=True, data={})):
+            result = tool.invoke({"operation": "navigate", "url": "http://example.com", "timeout": 10}, ctx)
+        assert result.success is True
+
+    def test_https_allowed(self) -> None:
+        tool = BrowserTool()
+        ctx = ToolContext(network_allowed=True)
+        with patch.object(tool, "_navigate_http_fallback", return_value=ToolResult(success=True, data={})):
+            result = tool.invoke({"operation": "navigate", "url": "https://example.com", "timeout": 10}, ctx)
+        assert result.success is True
+
+    def test_private_ip_blocked(self) -> None:
+        tool = BrowserTool()
+        ctx = ToolContext(network_allowed=True)
+        result = tool.invoke({"operation": "navigate", "url": "http://192.168.1.1/admin", "timeout": 10}, ctx)
+        assert result.success is False
+        assert "private" in result.error.lower()
+
+    def test_loopback_blocked(self) -> None:
+        tool = BrowserTool()
+        ctx = ToolContext(network_allowed=True)
+        result = tool.invoke({"operation": "navigate", "url": "http://127.0.0.1:8080/secret", "timeout": 10}, ctx)
+        assert result.success is False
+        assert "private" in result.error.lower() or "loopback" in result.error.lower()
+
+
 class TestBrowserToolFallbackChain:
     def test_playwright_available_flag(self) -> None:
         # Playwright should be available in this test environment
@@ -395,9 +441,8 @@ class TestBrowserToolIntegration:
         tool = BrowserTool()
         ctx = ToolContext(network_allowed=True)
         result = tool.invoke({"operation": "navigate", "url": "https://httpbin.org/html", "timeout": 15}, ctx)
-        # May fail in air-gapped environments; skip if so
         if not result.success:
-            pytest.skip(f"Network unavailable or blocked: {result.error}")
+            pytest.skip(f"Browser skipped: {result.error}")
         assert result.success is True
         assert "Herman Melville" in result.data["title"] or result.data["status"] == 200
 
@@ -406,7 +451,7 @@ class TestBrowserToolIntegration:
         ctx = ToolContext(network_allowed=True)
         result = tool.invoke({"operation": "get_text", "url": "https://httpbin.org/html", "timeout": 15}, ctx)
         if not result.success:
-            pytest.skip(f"Network unavailable or blocked: {result.error}")
+            pytest.skip(f"Browser skipped: {result.error}")
         assert result.success is True
         assert "Moby Dick" in result.data or "Herman Melville" in result.data
 
@@ -415,6 +460,6 @@ class TestBrowserToolIntegration:
         ctx = ToolContext(network_allowed=True)
         result = tool.invoke({"operation": "get_links", "url": "https://httpbin.org/html", "timeout": 15}, ctx)
         if not result.success:
-            pytest.skip(f"Network unavailable or blocked: {result.error}")
+            pytest.skip(f"Browser skipped: {result.error}")
         assert result.success is True
         assert isinstance(result.data, list)

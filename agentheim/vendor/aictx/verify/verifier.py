@@ -216,6 +216,27 @@ def _detect_public_docs_impacts(
     return impacts
 
 
+# Runtime/build artifact prefixes and exact names excluded from changed-source detection.
+# Must stay in sync with agentheim.vendor.aictx.llm.transfer.RUNTIME_BLOCKED_PREFIXES
+# and agentheim.vendor.aictx.scan.ignore.BUILTIN_HARD_EXCLUDES.
+_RUNTIME_BLOCKED_PREFIXES = (
+    ".git/",
+    ".aictx/",
+    ".ai-team/",
+    ".pytest_cache/",
+    "build/",
+    "dist/",
+    "node_modules/",
+)
+_RUNTIME_BLOCKED_NAMES = frozenset({".coverage", "agentheim.egg-info"})
+
+
+def _is_runtime_artifact(path: str) -> bool:
+    if path in _RUNTIME_BLOCKED_NAMES:
+        return True
+    return any(path.startswith(prefix) or path.startswith(prefix.rstrip("/")) for prefix in _RUNTIME_BLOCKED_PREFIXES)
+
+
 def determine_changed_source_paths(
     inventory: RepositoryInventory, lock: ContextLock | None
 ) -> list[str]:
@@ -228,6 +249,7 @@ def determine_changed_source_paths(
         and not file.is_generated
         and file.sha256 != "skipped"
         and file.path != "docs/AIprojectcontext/context.lock.json"
+        and not _is_runtime_artifact(file.path)
     }
     if lock is None:
         return sorted(current)

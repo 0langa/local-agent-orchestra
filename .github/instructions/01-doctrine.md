@@ -16,6 +16,8 @@ Violating any law is an architectural breach and blocks merge.
 
 `core/` must not contain concrete provider names, workflow names, agent roles, tool implementations, AICtx implementation details, or product-specific shortcuts. Core knows protocols, registries, events, policies, budgets, ledgers, and generic runtime contracts.
 
+> Exception: `core/model_registry.py` contains `DEFAULT_PROVIDER_MAP` as a bootstrapping default. The `ModelRegistry` class itself remains fully generic and accepts any `provider_map`.
+
 ### 2. Workflow Pack Autonomy
 
 Workflow packs in `workflows/` define their own agents, steps, prompts, policies, and verification behavior. They must not import provider implementations directly, mutate core state, or bypass the policy engine.

@@ -67,6 +67,7 @@ def ping_models() -> None:
     table.add_column("endpoint")
     table.add_column("status")
 
+    any_failed = False
     for role, model_config in config.by_role().items():
         try:
             provider = registry.create_provider(model_config)
@@ -83,8 +84,10 @@ def ping_models() -> None:
             status = "ok" if response.content.strip() else "empty-response"
         except NotImplementedError as exc:
             status = f"not-implemented: {exc}"
+            any_failed = True
         except Exception as exc:
             status = f"error: {exc}"
+            any_failed = True
         table.add_row(
             role.value,
             model_config.provider,
@@ -94,6 +97,8 @@ def ping_models() -> None:
         )
 
     console.print(table)
+    if any_failed:
+        raise typer.Exit(code=1)
 
 
 @app.command("inspect")
@@ -586,7 +591,7 @@ def mcp_list_cmd(
         servers = load_mcp_config(config_path)
     except Exception as exc:
         console.print(f"[red]Failed to load MCP config:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=1)
 
     table = Table(title="MCP Tools")
     table.add_column("Server")
@@ -636,7 +641,7 @@ def mcp_call_cmd(
         servers = load_mcp_config(config_path)
     except Exception as exc:
         console.print(f"[red]Failed to load MCP config:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=1)
 
     for server in servers:
         if not server.enabled:
@@ -661,7 +666,7 @@ def main() -> None:
         app()
     except (ConfigError, AIteamError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

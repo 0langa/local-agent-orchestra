@@ -4,11 +4,16 @@ import json
 import os
 import re
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.errors import ConfigError
+
+# Load .env from repo root or cwd if present.
+load_dotenv(Path.cwd() / ".env", override=False)
 
 
 class ModelRole(StrEnum):
@@ -272,7 +277,7 @@ def _load_legacy_grok_config() -> TeamConfig:
 
         if not endpoint or not api_key:
             raise ConfigError(
-                "No provider configuration found. Copy Agent-Team/.env.example to .env and configure AI_TEAM_PROVIDER_IDS and AI_TEAM_PROVIDER_* variables."
+                "No provider configuration found. Copy .env.example to .env and configure AI_TEAM_PROVIDER_IDS and AI_TEAM_PROVIDER_* variables, or export them directly."
             )
         provider_id = f"legacy-{model_id}"
         api_key_env = f"AI_TEAM_LEGACY_{model_id.upper()}_API_KEY"

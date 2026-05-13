@@ -17,6 +17,15 @@ from typing import Any
 from core.errors import ToolSafetyError
 from core.tool_protocol import AsyncBaseTool, BaseTool, ParamSchema, ReturnSchema, RiskLevel, ToolContext, ToolResult, ToolSchema
 from tools.browser.session import BrowserSessionManager
+from tools.network import NetworkEnforcer, NetworkPolicy, NetworkViolation
+
+# Default browser network policy: http/https only, private/link-local blocked.
+_BROWSER_POLICY = NetworkPolicy(
+    allowed=True,
+    allowed_schemes=("http", "https"),
+    deny_private_ranges=True,
+    deny_link_local=True,
+)
 
 
 class BrowserTool(BaseTool):
@@ -54,6 +63,20 @@ class BrowserTool(BaseTool):
         )
         super().__init__("browser", schema, RiskLevel.HIGH)
 
+    @staticmethod
+    def _validate_url(url: str) -> None:
+        """Validate URL scheme and host against browser network policy.
+
+        Raises ToolSafetyError on violation.
+        """
+        if not url:
+            return
+        enforcer = NetworkEnforcer(_BROWSER_POLICY)
+        try:
+            enforcer.validate(url)
+        except NetworkViolation as exc:
+            raise ToolSafetyError(str(exc)) from exc
+
     def invoke(self, params: dict[str, Any], context: ToolContext) -> ToolResult:
         valid, err = self.validate_params(params)
         if not valid:
@@ -66,6 +89,12 @@ class BrowserTool(BaseTool):
         # Network policy check
         if not context.network_allowed:
             return ToolResult(success=False, error="Network access is not allowed by policy.")
+
+        # URL scheme/host enforcement
+        try:
+            self._validate_url(url)
+        except ToolSafetyError as exc:
+            return ToolResult(success=False, error=str(exc))
 
         try:
             if operation == "create_session":
@@ -122,6 +151,7 @@ class BrowserTool(BaseTool):
 
     def _get_page(self, url: str, timeout: int, session_id: str | None):
         """Return a page object, creating a transient session if needed."""
+        self._validate_url(url)
         manager = BrowserSessionManager()
         if session_id:
             page = manager.get_page(session_id)
@@ -427,9 +457,15 @@ class AsyncBrowserTool(AsyncBaseTool):
             return ToolResult(success=False, error=err)
 
         operation = params.get("operation")
+        url = params.get("url", "")
 
         if not context.network_allowed:
             return ToolResult(success=False, error="Network access is not allowed by policy.")
+
+        try:
+            BrowserTool._validate_url(url)
+        except ToolSafetyError as exc:
+            return ToolResult(success=False, error=str(exc))
 
         try:
             if operation == "create_session":
@@ -480,6 +516,7 @@ class AsyncBrowserTool(AsyncBaseTool):
             browser = await p.chromium.launch()
             try:
                 page = await browser.new_page()
+                BrowserTool._validate_url(url)
                 if url:
                     await page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
 

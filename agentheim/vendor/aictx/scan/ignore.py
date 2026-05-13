@@ -9,7 +9,11 @@ import pathspec
 BUILTIN_HARD_EXCLUDES = [
     ".git",
     ".aictx",
+    ".ai-team",
     ".pytest-tmp",
+    ".pytest_cache",
+    ".coverage",
+    "agentheim.egg-info",
     "bin",
     "obj",
     "node_modules",

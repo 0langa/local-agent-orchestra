@@ -1,6 +1,6 @@
 # Agentheim
 
-[![Tests](https://img.shields.io/badge/tests-695%20passing-brightgreen)](https://github.com/0langa/agentheim/actions)
+[![Tests](https://img.shields.io/badge/tests-760%20passing-brightgreen)](https://github.com/0langa/agentheim/actions)
 [![Architecture](https://img.shields.io/badge/architecture-local_first-blue)](docs/ARCHITECTURE.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-unified-blue)](docs/README.md)
@@ -114,7 +114,7 @@ Core Runtime (Generic)    →  DAG execution, policy engine, ledger, model regis
 pytest tests\ -v
 ```
 
-**695 tests passing, 3 skipped in this validated environment.** The skipped tests are optional GUI-environment checks when desktop dependencies are unavailable.
+**760 tests passing, 3 skipped in this validated environment.** The skipped tests are optional GUI-environment checks when desktop dependencies are unavailable.
 
 ---
 

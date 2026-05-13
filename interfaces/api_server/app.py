@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -121,7 +122,9 @@ class ModelListItem(BaseModel):
 
 class ProviderListItem(BaseModel):
     provider_id: str
-    healthy: bool
+    available: bool = False  # Adapter can be imported
+    healthy: bool = False    # Implemented and not known-broken
+    configured: bool = False  # Has live config/env (best-effort)
     error: str | None = None
 
 
@@ -219,13 +222,18 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # CORS
+    # CORS — default localhost-only; override via AGENTHEIM_CORS_ORIGINS env.
+    _cors_origins = os.getenv("AGENTHEIM_CORS_ORIGINS", "")
+    if _cors_origins:
+        allow_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+    else:
+        allow_origins = ["http://localhost", "http://127.0.0.1"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure in production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=allow_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Content-Type", "Authorization"],
     )
 
     tool_registry = ToolRegistry(repo_root)
@@ -285,19 +293,65 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
                 params[name]["enum"] = ps.enum
         return params
 
-    def _check_provider_health(provider_id: str) -> tuple[bool, str | None]:
-        """Check if a provider is healthy by attempting a lightweight operation."""
+    def _check_provider_health(provider_id: str) -> tuple[bool, bool, bool, str | None]:
+        """Return (available, healthy, configured, error) for a provider.
+
+        *available* = adapter module/class can be imported.
+        *healthy*   = provider is implemented (not NotImplementedError).
+        *configured* = live env/config present (best-effort, may be False
+                       even for working setups).
+        """
         descriptor = DEFAULT_PROVIDER_MAP.get(provider_id)
         if descriptor is None:
-            return False, "Unknown provider"
+            return False, False, False, "Unknown provider"
         try:
             import importlib
             module_path, class_name = descriptor.import_path.split(":", 1)
             module = importlib.import_module(module_path)
-            getattr(module, class_name)
-            return True, None
+            cls = getattr(module, class_name)
         except Exception as exc:
-            return False, str(exc)
+            return False, False, False, str(exc)
+
+        # Check implementation status by instantiating with dummy config
+        # and invoking with a dummy request. NotImplementedError in
+        # either path means the adapter exists but is not implemented.
+        try:
+            from config.config import ProviderConfig
+            from providers.base import ModelRequest, ModelRole
+
+            dummy = ProviderConfig(
+                id=provider_id,
+                provider_type="test",
+                endpoint="http://localhost",
+                api_key_env="TEST_KEY",
+                timeout_seconds=1,
+                headers={},
+            )
+            instance = cls(dummy)
+            instance.invoke(
+                ModelRequest(
+                    role=ModelRole.PLANNER,
+                    system_prompt="",
+                    user_prompt="ping",
+                )
+            )
+        except NotImplementedError as exc:
+            return True, False, False, f"not implemented: {exc}"
+        except Exception:
+            # Other errors are expected with dummy config (network/auth/etc).
+            # They prove the provider is implemented enough to try.
+            pass
+
+        # Best-effort configured check
+        configured = False
+        try:
+            from config.config import load_team_config
+            team = load_team_config()
+            configured = any(m.provider == provider_id for m in team.models.values())
+        except Exception:
+            pass
+
+        return True, True, configured, None
 
     def _get_ops(config=None):
         cfg = config if config is not None else AictxConfig()
@@ -533,14 +587,16 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def list_providers() -> list[ProviderListItem]:
         """List providers and their health status."""
         providers = [
-            ProviderListItem(provider_id="openai_v1", healthy=True),
-            ProviderListItem(provider_id="aws_bedrock", healthy=True),
-            ProviderListItem(provider_id="azure_foundry", healthy=True),
-            ProviderListItem(provider_id="oci_genai", healthy=True),
+            ProviderListItem(provider_id="openai_v1"),
+            ProviderListItem(provider_id="aws_bedrock"),
+            ProviderListItem(provider_id="azure_foundry"),
+            ProviderListItem(provider_id="oci_genai"),
         ]
         for p in providers:
-            healthy, error = _check_provider_health(p.provider_id)
+            available, healthy, configured, error = _check_provider_health(p.provider_id)
+            p.available = available
             p.healthy = healthy
+            p.configured = configured
             p.error = error
         return providers
 

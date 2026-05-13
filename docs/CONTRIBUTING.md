@@ -143,6 +143,8 @@ scripts/        # Tooling (directive checks and legacy helpers)
 
 **Key rule:** `core/` knows no provider, model, workflow, or tool names. Everything concrete lives in its own subsystem.
 
+> Exception: `core/model_registry.py` holds `DEFAULT_PROVIDER_MAP` as a bootstrapping default. The `ModelRegistry` class remains fully generic.
+
 ---
 
 ## How to Contribute

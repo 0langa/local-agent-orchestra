@@ -38,7 +38,7 @@ pytest -q
 pytest -q tests/
 ```
 
-Current status: **695 passed, 3 skipped** (skipped tests are optional GUI-environment checks when desktop dependencies are unavailable).
+Current status: **760 passed, 3 skipped** (skipped tests are optional GUI-environment checks when desktop dependencies are unavailable).
 
 ---
 

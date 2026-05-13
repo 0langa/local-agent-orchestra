@@ -45,7 +45,7 @@ Agentheim is a **preset-driven, local-first AI automation platform** with a gene
 
 ### Design Principles
 
-- **Core ignorance** — `core/` knows no provider, model, workflow, or tool names
+- **Core ignorance** — `core/` knows no provider, model, workflow, or tool names (one exception: `core/model_registry.py` contains `DEFAULT_PROVIDER_MAP` as a bootstrapping default; the `ModelRegistry` class itself remains fully generic)
 - **Local-first** — zero external services required; privacy modes enforced in code
 - **Safety by default** — destructive ops require approval; policies are code, not prompts
 - **Fully auditable** — every run produces an append-only event ledger
@@ -233,7 +233,9 @@ The project is governed by **7 Immutable Laws** defined in the [Project Doctrine
 
 | # | Law | One-Line Rule |
 |---|-----|---------------|
-| 1 | **Core Ignorance** | `core/` knows NO provider, workflow, tool, or model names |
+| 1 | **Core Ignorance** | `core/` knows NO provider, workflow, tool, or model names* |
+
+\* One intentional exception: `core/model_registry.py` holds `DEFAULT_PROVIDER_MAP` as a convenience default. The `ModelRegistry` class accepts any `provider_map` parameter and remains generic.
 | 2 | **Pack Autonomy** | Workflow packs don't import providers or mutate core state |
 | 3 | **Provider Swap** | All providers are lazy-loaded, interchangeable adapters |
 | 4 | **Disclosure** | Beginner gets presets. Power-user gets config. Dev gets APIs. |
