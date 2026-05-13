@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from providers.base import ModelProvider, ModelRequest, ModelResponse
+from providers.base import ModelProvider, ModelRequest, ModelResponse, log_token_usage
 
 
 class AWSBedrockProvider(ModelProvider):
@@ -71,13 +71,24 @@ class AWSBedrockProvider(ModelProvider):
                 content += block.get("text", "")
 
         usage = response.get("usage", {})
+        input_tokens = usage.get("inputTokens", 0)
+        output_tokens = usage.get("outputTokens", 0)
         raw = {
-            "input_tokens": usage.get("inputTokens", 0),
-            "output_tokens": usage.get("outputTokens", 0),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
             "total_tokens": usage.get("totalTokens", 0),
             "region": region,
             "model_id": self.config.model,
         }
+
+        log_token_usage(
+            provider="aws_bedrock",
+            model=self.config.model,
+            role=request.role.value,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            metadata={"region": region},
+        )
 
         return ModelResponse(
             role=request.role,

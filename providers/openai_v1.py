@@ -5,7 +5,7 @@ import time
 from openai import OpenAI
 
 from core.errors import ProviderError
-from providers.base import ModelProvider, ModelRequest, ModelResponse
+from providers.base import ModelProvider, ModelRequest, ModelResponse, log_token_usage
 
 
 class OpenAIV1Provider(ModelProvider):
@@ -44,6 +44,18 @@ class OpenAIV1Provider(ModelProvider):
         else:  # pragma: no cover - network/provider dependent
             raise ProviderError(f"Model invocation failed after retries: {last_error}") from last_error
         content = response.choices[0].message.content or ""
+        usage = response.usage
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
+
+        log_token_usage(
+            provider=self.config.provider,
+            model=self.config.model,
+            role=request.role.value,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
         return ModelResponse(
             role=request.role,
             model=self.config.model,

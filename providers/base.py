@@ -1,11 +1,57 @@
 from __future__ import annotations
 
+import json
+import os
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from config.config import AgentModelConfig, ModelRole
+
+
+# ------------------------------------------------------------------
+# Token usage logging (dev-only, writes to .ai-team/tokens.jsonl)
+# ------------------------------------------------------------------
+
+def log_token_usage(
+    provider: str,
+    model: str,
+    role: str,
+    input_tokens: int,
+    output_tokens: int,
+    duration_ms: float | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Append a token-usage record to ``.ai-team/tokens.jsonl``.
+
+    Safe to call from any provider.  Silently skips if the directory
+    does not exist (e.g. in unit tests).
+    """
+    log_path = Path(".ai-team") / "tokens.jsonl"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "provider": provider,
+        "model": model,
+        "role": role,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+        "duration_ms": duration_ms,
+        "metadata": metadata or {},
+    }
+    try:
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
 
 
 class ModelRequest(BaseModel):
