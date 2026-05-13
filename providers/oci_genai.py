@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from providers.base import ModelProvider, ModelRequest, ModelResponse
+from providers.base import ModelProvider, ModelRequest, ModelResponse, log_token_usage
 
 
 class OCIGenAIProvider(ModelProvider):
@@ -22,6 +22,14 @@ class OCIGenAIProvider(ModelProvider):
         )
 
         chat_response = aictx_provider.chat(chat_request)
+
+        log_token_usage(
+            provider="oci_genai",
+            model=self.config.model,
+            role=request.role.value,
+            input_tokens=chat_response.input_tokens,
+            output_tokens=chat_response.output_tokens,
+        )
 
         return ModelResponse(
             role=request.role,
