@@ -23,3 +23,4 @@ class FinalReport(BaseModel):
     run_id: str
     next_command_suggestions: list[str] = Field(default_factory=list)
     status: str = "done"
+    stale_context_warning: str | None = None

@@ -51,6 +51,7 @@ class WorkflowRunner:
         metadata: Optional[dict[str, Any]] = None,
         *,
         resume_from: str | None = None,
+        stale_context_check: bool = False,
     ) -> list[StepResult]:
         """Execute *workflow* against *repo_root*.
 
@@ -113,6 +114,27 @@ class WorkflowRunner:
         # Results accumulator
         results: list[StepResult] = []
         # ``prior`` may already contain resumed results
+
+        # Stale-context preflight (lazy import to avoid top-level vendor deps in core/)
+        self._context_stale: bool = False
+        if stale_context_check:
+            from agentheim.context_ops_impl import AictxContextOps
+
+            ops = AictxContextOps()
+            status = ops.status(repo_root, strict=False)
+            self._context_stale = status.is_stale
+            if ledger is not None:
+                ledger.emit_event(
+                    EventType.CONTEXT_STALE_DETECTED,
+                    payload={
+                        "is_stale": status.is_stale,
+                        "next_command": status.next_command,
+                        "stale_sources": status.stale_sources,
+                        "missing_sources": status.missing_sources,
+                        "missing_generated": status.missing_generated,
+                        "generated_mismatches": status.generated_mismatches,
+                    },
+                )
 
         try:
             # Execute DAG
@@ -430,14 +452,19 @@ class WorkflowRunner:
     # Condition evaluation
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _eval_condition(condition: str, prior: dict[str, StepResult]) -> bool:
+    def _eval_condition(self, condition: str, prior: dict[str, StepResult]) -> bool:
         """Evaluate a step condition against prior results.
 
         Supports:
         - "step_id" → True if that step succeeded
         - "not step_id" → True if that step failed or is absent
+        - "context_fresh" → True if context is not stale (requires stale_context_check)
+        - "context_stale" → True if context is stale (requires stale_context_check)
         """
+        if condition == "context_fresh":
+            return not getattr(self, "_context_stale", False)
+        if condition == "context_stale":
+            return getattr(self, "_context_stale", False)
         if condition.startswith("not "):
             target = condition[4:]
             prev = prior.get(target, StepResult(step_id=target, success=True))

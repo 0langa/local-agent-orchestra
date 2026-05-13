@@ -186,3 +186,86 @@ class ArtifactStore:
         path = self.run_dir / "patch.diff"
         path.write_text(diff, encoding="utf-8")
         return path
+
+    def produce_context_run_report(self, report: dict[str, Any] | Any) -> Path:
+        """Write context_run_report.md.
+
+        Args:
+            report: Dict or dataclass with fields:
+                run_id, scope, write_mode, files_scanned, files_selected,
+                generated_files, timing, entropy.
+        """
+        path = self.run_dir / "context_run_report.md"
+
+        # Normalize dataclass → dict
+        if hasattr(report, "__dataclass_fields__"):
+            from dataclasses import asdict
+            data = asdict(report)  # type: ignore[arg-type]
+        else:
+            data = dict(report)  # type: ignore[arg-type]
+
+        lines: list[str] = [
+            "# Context Run Report",
+            "",
+            f"- **Run ID**: {data.get('run_id', 'N/A')}",
+            f"- **Scope**: {data.get('scope', 'N/A')}",
+            f"- **Write Mode**: {data.get('write_mode', 'N/A')}",
+            "",
+            "## Files",
+            "",
+            f"- **Scanned**: {data.get('files_scanned', 'N/A')}",
+            f"- **Selected**: {data.get('files_selected', 'N/A')}",
+            f"- **Generated**: {data.get('generated_files', 'N/A')}",
+            "",
+            "## Telemetry",
+            "",
+            f"- **Timing**: {data.get('timing', 'N/A')}",
+            f"- **Entropy**: {data.get('entropy', 'N/A')}",
+            "",
+        ]
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def produce_context_lock(self, lock_path: Path | str | None = None) -> Path:
+        """Copy the context lockfile into artifacts as context.lock.json.
+
+        Defaults to ``docs/AIprojectcontext/context.lock.json`` relative
+        to the project root (resolved from *cwd*).
+        """
+        if lock_path is None:
+            lock_path = Path("docs/AIprojectcontext/context.lock.json")
+        src = Path(lock_path)
+        dst = self.run_dir / "context.lock.json"
+        if src.exists():
+            dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        else:
+            dst.write_text("{}", encoding="utf-8")
+        return dst
+
+    def produce_public_docs_impact(self, report: dict[str, Any] | Any) -> Path:
+        """Write public_docs_impact.md."""
+        path = self.run_dir / "public_docs_impact.md"
+
+        if hasattr(report, "__dataclass_fields__"):
+            from dataclasses import asdict
+            data = asdict(report)  # type: ignore[arg-type]
+        else:
+            data = dict(report)  # type: ignore[arg-type]
+
+        lines: list[str] = [
+            "# Public Docs Impact Report",
+            "",
+        ]
+        entries = data.get("entries", [])
+        if entries:
+            lines.append("## Entries")
+            lines.append("")
+            for entry in entries:
+                lines.append(f"- {entry}")
+            lines.append("")
+        else:
+            lines.append("No public documentation impacts detected.")
+            lines.append("")
+
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path

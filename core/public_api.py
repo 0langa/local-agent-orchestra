@@ -115,6 +115,30 @@ from core.artifact_store import ArtifactSpec as ArtifactSpec
 from core.context_packer import ContextManifest as ContextManifest
 from core.context_packer import ContextPacker as ContextPacker
 
+
+# Lazy imports for ContextOps to avoid circular dependencies at module load.
+# Dataclasses import directly (no vendor deps); ABC + impl are deferred.
+from agentheim.context_ops import (
+    CleanResult as CleanResult,
+    ContextPlan as ContextPlan,
+    ContextStatus as ContextStatus,
+    GeneratedContext as GeneratedContext,
+    PublicDocsImpactReport as PublicDocsImpactReport,
+    RepositoryInventory as RepositoryInventory,
+    VerificationResult as VerificationResult,
+    WriteReport as WriteReport,
+)
+
+
+def __getattr__(name: str):
+    if name == "ContextOps":
+        from agentheim.context_ops import ContextOps
+        return ContextOps
+    if name == "AictxContextOps":
+        from agentheim.context_ops_impl import AictxContextOps
+        return AictxContextOps
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 # ─── Redaction ──────────────────────────────────────────────────────
 from core.redaction import redact_dict as redact_dict
 from core.redaction import redact_text as redact_text
@@ -259,4 +283,15 @@ __all__ = [
     "WorkflowStep",
     "WorkflowStepStatus",
     "RuntimeAgentMessage",
+    # ContextOps (lazy)
+    "ContextOps",
+    "AictxContextOps",
+    "RepositoryInventory",
+    "ContextPlan",
+    "GeneratedContext",
+    "WriteReport",
+    "VerificationResult",
+    "ContextStatus",
+    "PublicDocsImpactReport",
+    "CleanResult",
 ]

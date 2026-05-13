@@ -59,6 +59,15 @@ class EventType(str, Enum):
     # Artifact / context
     ARTIFACT_CREATED = "artifact_created"
     CONTEXT_PACKED = "context_packed"
+    CONTEXT_SCANNED = "context_scanned"
+    CONTEXT_GENERATED = "context_generated"
+    CONTEXT_WRITTEN = "context_written"
+    CONTEXT_VERIFIED = "context_verified"
+    CONTEXT_INITIALIZED = "context_initialized"
+    CONTEXT_PLANNED = "context_planned"
+    CONTEXT_STALE_DETECTED = "context_stale_detected"
+    PUBLIC_DOCS_IMPACT_MAPPED = "public_docs_impact_mapped"
+    PUBLIC_DOCS_UPDATED = "public_docs_updated"
 
     # State / memory
     STATE_TRANSITION = "state_transition"

@@ -5,8 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from config.config import ModelRole, load_team_config
+from agentheim.context_ops_impl import AictxContextOps
+from agentheim.vendor.aictx.config import AictxConfig
+from agentheim.context_run_ledger import ContextRunLedger
 from core.public_api import (
     AIteamError,
+    EventType,
     ExecutionError,
     ImplementationPlan,
     ModelRegistry,
@@ -21,6 +25,7 @@ from core.public_api import (
     UserTask,
     VerificationError,
     VerificationReport,
+    VerificationResult,
     WorkOrder,
     build_context_pack,
     inspect_repository,
@@ -97,10 +102,78 @@ def build_plan_prompt(user_task: UserTask, scan: RepoScanResult, context_pack: s
     )
 
 
+def _read_context_shards(repo_root: Path) -> str:
+    """Build compact context string from AICtx shards in docs/AIprojectcontext/."""
+    ctx_dir = repo_root / "docs" / "AIprojectcontext"
+    if not ctx_dir.exists():
+        return ""
+
+    parts: list[str] = []
+    for name in ("project-state.md", "code-map.md", "change-impact-map.md"):
+        path = ctx_dir / name
+        if path.exists():
+            parts.append(f"--- {name} ---\n{path.read_text(encoding='utf-8')}")
+
+    for shard in sorted(ctx_dir.glob("*.md")):
+        if shard.name in {"project-state.md", "code-map.md", "change-impact-map.md"}:
+            continue
+        parts.append(f"--- {shard.name} ---\n{shard.read_text(encoding='utf-8')}")
+
+    return "\n\n".join(parts)
+
+
+def _resolve_context_pack(
+    repo_root: Path,
+    scan: RepoScanResult,
+    ledger: RunLedger | None = None,
+) -> tuple[str, bool]:
+    """Optionally use AICtx-derived context; fall back to legacy build_context_pack."""
+    ctx_ledger = ContextRunLedger(ledger) if ledger else None
+    try:
+        ops = AictxContextOps()
+        inventory = ops.scan(repo_root)
+        if ctx_ledger:
+            ctx_ledger.emit_scanned(inventory)
+
+        status = ops.status(repo_root)
+        was_stale = status.is_stale
+
+        if was_stale or not (repo_root / "docs" / "AIprojectcontext" / "context.lock.json").exists():
+            if ctx_ledger:
+                ctx_ledger.emit_status(status)
+            ops.run_pipeline(
+                repo_root,
+                run_id="coding-ctx",
+                scope="changed",
+                write_mode="apply",
+            )
+            if ctx_ledger:
+                ctx_ledger.emit_generated(repo_root, fact_pack_count=0)
+
+        context_string = _read_context_shards(repo_root)
+        if not context_string:
+            raise RuntimeError("No AICtx context shards found.")
+
+        if ctx_ledger:
+            ctx_ledger.emit_verified(
+                VerificationResult(result="PASS", is_pass=True)
+            )
+        return context_string, was_stale
+    except Exception:
+        if ledger:
+            ledger.append_event(
+                EventType.FALLBACK_USED,
+                payload={"message": "AICtx context generation failed, falling back to legacy context pack"},
+            )
+        return build_context_pack(scan), False
+
+
 def plan_task(task_text: str, repo_path: str | Path, write_ledger: bool = False) -> tuple[RepoScanResult, str, ImplementationPlan, Path | None]:
     user_task = UserTask(request=task_text)
     scan = inspect_repository(repo_path)
-    context_pack = build_context_pack(scan)
+    repo_path_resolved = Path(repo_path).resolve()
+    ledger: RunLedger | None = RunLedger.create(repo_path_resolved, "plan") if write_ledger else None
+    context_pack, _ = _resolve_context_pack(repo_path_resolved, scan, ledger)
     team_config = load_team_config()
     registry = ModelRegistry.from_team_config(team_config, provider_map=DEFAULT_PROVIDER_MAP)
     orchestrator = create_orchestrator_agent(registry)
@@ -109,7 +182,6 @@ def plan_task(task_text: str, repo_path: str | Path, write_ledger: bool = False)
 
     ledger_dir: Path | None = None
     if write_ledger:
-        ledger = RunLedger.create(Path(repo_path).resolve(), "plan")
         ledger.write_json("run.json", {"action": "plan", "repo_name": scan.repo_name, "task": task_text})
         ledger.write_json("repo_snapshot.json", scan.model_dump())
         ledger.write_text("context_pack.md", context_pack)
@@ -280,7 +352,7 @@ def run_task(
         ledger.write_json("repo_snapshot.json", scan.model_dump())
 
         state_machine.transition(RuntimeState.BUILD_CONTEXT_PACK)
-        context_pack = build_context_pack(scan)
+        context_pack, was_stale = _resolve_context_pack(repo_root, scan, ledger)
         ledger.write_text("context_pack.md", context_pack)
         registry = ModelRegistry.from_team_config(team_config, provider_map=DEFAULT_PROVIDER_MAP)
 
@@ -428,6 +500,7 @@ def run_task(
                         remaining_risks=[*verify_report.failed_checks, *verify_report.regressions],
                         run_id=ledger.run_dir.name,
                         next_command_suggestions=[f"python -m interfaces.cli report --repo . --run-id {ledger.run_dir.name}"],
+                        stale_context_warning="Context was stale at workflow start; AICtx pipeline re-generated." if was_stale else None,
                         status="blocked",
                     )
                     ledger.write_json("final_report.json", report.model_dump())
@@ -444,6 +517,7 @@ def run_task(
                         remaining_risks=[*verify_report.failed_checks, *verify_report.regressions],
                         run_id=ledger.run_dir.name,
                         next_command_suggestions=[f"python -m interfaces.cli resume --repo . --run-id {ledger.run_dir.name}"],
+                        stale_context_warning="Context was stale at workflow start; AICtx pipeline re-generated." if was_stale else None,
                         status="blocked",
                     )
                     ledger.write_json("final_report.json", report.model_dump())
@@ -487,6 +561,7 @@ def run_task(
                         remaining_risks=[last_error],
                         run_id=ledger.run_dir.name,
                         next_command_suggestions=[f"python -m interfaces.cli report --repo . --run-id {ledger.run_dir.name}"],
+                        stale_context_warning="Context was stale at workflow start; AICtx pipeline re-generated." if was_stale else None,
                         status="blocked",
                     )
                     ledger.write_json("final_report.json", report.model_dump())
@@ -520,6 +595,7 @@ def run_task(
                     remaining_risks=[*verify_report.failed_checks, *verify_report.regressions],
                     run_id=ledger.run_dir.name,
                     next_command_suggestions=[f"python -m interfaces.cli resume --repo . --run-id {ledger.run_dir.name}"],
+                    stale_context_warning="Context was stale at workflow start; AICtx pipeline re-generated." if was_stale else None,
                     status="blocked",
                 )
                 ledger.write_json("final_report.json", report.model_dump())
@@ -541,6 +617,7 @@ def run_task(
             remaining_risks=remaining_risks,
             run_id=ledger.run_dir.name,
             next_command_suggestions=[] if verification_records else ["python -m interfaces.cli inspect --repo . --write-ledger"],
+            stale_context_warning="Context was stale at workflow start; AICtx pipeline re-generated." if was_stale else None,
             status="done",
         )
         ledger.write_json("final_report.json", report.model_dump())

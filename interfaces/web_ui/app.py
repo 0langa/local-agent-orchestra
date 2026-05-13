@@ -21,6 +21,9 @@ from core.public_api import (
 from memory.bus import MemoryBus
 from tools.registry import ToolRegistry
 
+from agentheim.context_ops_impl import AictxContextOps
+from agentheim.vendor.aictx.config import AictxConfig
+
 
 # ------------------------------------------------------------------
 # Pydantic models (module-level for FastAPI compatibility)
@@ -94,6 +97,48 @@ class RunStatusResponse(BaseModel):
     error: str | None = None
 
 
+class CtxInitRequest(BaseModel):
+    project_path: str = "."
+
+
+class CtxScanRequest(BaseModel):
+    project_path: str = "."
+
+
+class CtxRunRequest(BaseModel):
+    project_path: str = "."
+    scope: str = "full"
+    write_mode: str = "patch"
+    allow_dirty: bool = False
+
+
+class CtxVerifyRequest(BaseModel):
+    project_path: str = "."
+    strict: bool = False
+
+
+class CtxStatusRequest(BaseModel):
+    project_path: str = "."
+    strict: bool = False
+
+
+class CtxCleanRequest(BaseModel):
+    project_path: str = "."
+    run_id: str | None = None
+    keep_runs: int | None = None
+
+
+class CtxPublicDocsImpactRequest(BaseModel):
+    project_path: str = "."
+    scope: str = "full"
+
+
+class CtxPublicDocsUpdateRequest(BaseModel):
+    project_path: str = "."
+    scope: str = "changed"
+    write_mode: str = "patch"
+
+
 # ------------------------------------------------------------------
 # App factory
 # ------------------------------------------------------------------
@@ -110,6 +155,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     tool_registry = ToolRegistry(repo_root)
     memory_bus = MemoryBus(repo_root)
     run_executor = RunExecutor()
+    aictx_config = AictxConfig()
 
     # Serve static files if the directory exists
     static_dir = Path(__file__).parent / "static"
@@ -310,6 +356,80 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         memory_bus.write(scope, key, body.value)
         return MemoryWriteResponse(scope=scope, key=key)
 
+    @app.post("/api/ctx/init")
+    def ctx_init(body: CtxInitRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        ops.init(Path(body.project_path))
+        return {"ok": True}
+
+    @app.post("/api/ctx/scan")
+    def ctx_scan(body: CtxScanRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        inventory = ops.scan(Path(body.project_path))
+        return {"repo_root": inventory.repo_root, "head_commit": inventory.head_commit}
+
+    @app.post("/api/ctx/run")
+    def ctx_run(body: CtxRunRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        report = ops.run_pipeline(
+            repo_root=Path(body.project_path),
+            run_id="webui-ctx",
+            scope=body.scope,
+            write_mode=body.write_mode,
+            allow_dirty=body.allow_dirty,
+        )
+        return {
+            "generated_files": report.generated_files,
+            "lockfile_path": report.lockfile_path,
+            "patch_text": report.patch_text,
+        }
+
+    @app.post("/api/ctx/verify")
+    def ctx_verify(body: CtxVerifyRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        result = ops.verify(Path(body.project_path), strict=body.strict)
+        return {"result": result.result, "is_pass": result.is_pass}
+
+    @app.post("/api/ctx/status")
+    def ctx_status(body: CtxStatusRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        st = ops.status(Path(body.project_path), strict=body.strict)
+        return {
+            "is_stale": st.is_stale,
+            "stale_sources": st.stale_sources,
+            "missing_sources": st.missing_sources,
+            "missing_generated": st.missing_generated,
+            "generated_mismatches": st.generated_mismatches,
+            "public_docs_impacts": st.public_docs_impacts,
+            "next_command": st.next_command,
+        }
+
+    @app.post("/api/ctx/clean")
+    def ctx_clean(body: CtxCleanRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        result = ops.clean(Path(body.project_path), run_id=body.run_id, keep_runs=body.keep_runs)
+        return {
+            "removed_count": result.removed_count,
+            "kept_count": result.kept_count,
+            "removed_paths": result.removed_paths,
+        }
+
+    @app.post("/api/ctx/public-docs/impact")
+    def ctx_public_docs_impact(body: CtxPublicDocsImpactRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        report = ops.public_docs_impact(Path(body.project_path), scope=body.scope)
+        return {"entries": report.entries}
+
+    @app.post("/api/ctx/public-docs/update")
+    def ctx_public_docs_update(body: CtxPublicDocsUpdateRequest) -> dict[str, Any]:
+        ops = AictxContextOps(aictx_config)
+        patch_path = ops.public_docs_update(
+            Path(body.project_path),
+            scope=body.scope,
+            write_mode=body.write_mode,
+        )
+        return {"patch_path": str(patch_path) if patch_path else None}
+
     @app.websocket("/api/runs/{run_id}/ws")
     async def websocket_run_status(websocket: WebSocket, run_id: str):
         """Stream run status updates via WebSocket."""
@@ -399,6 +519,14 @@ def _dashboard_html() -> str:
   #status { margin-bottom: 1.5rem; font-size: 0.85rem; color: #34d399; }
   .loading { color: #94a3b8; }
   .error { color: #f87171; }
+  .ctx-section { margin-top: 2rem; }
+  .ctx-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #60a5fa; }
+  .ctx-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+  .ctx-form label { font-size: 0.85rem; color: #94a3b8; }
+  .ctx-form input, .ctx-form select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.35rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+  .ctx-form button { background: #2563eb; border: none; color: #fff; padding: 0.4rem 0.75rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem; }
+  .ctx-form button:hover { background: #1d4ed8; }
+  .ctx-results { background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; margin-top: 1rem; min-height: 120px; font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto; color: #e2e8f0; }
 </style>
 </head>
 <body>
@@ -418,6 +546,43 @@ def _dashboard_html() -> str:
     <h2>Presets</h2>
     <ul id="presets-list"><li class="loading">Loading...</li></ul>
   </div>
+</div>
+<div class="ctx-section">
+  <h2>Context Operations</h2>
+  <div class="ctx-form">
+    <label>Project path</label>
+    <input type="text" id="ctx-project-path" value="." style="width: 200px;">
+  </div>
+  <div class="ctx-form">
+    <button onclick="ctxAction('init')">Init</button>
+    <button onclick="ctxAction('scan')">Scan</button>
+    <button onclick="ctxAction('verify')">Verify</button>
+    <button onclick="ctxAction('status')">Status</button>
+  </div>
+  <div class="ctx-form">
+    <label>Scope</label>
+    <select id="ctx-run-scope">
+      <option value="full">full</option>
+      <option value="changed">changed</option>
+    </select>
+    <label>Write mode</label>
+    <select id="ctx-run-mode">
+      <option value="patch">patch</option>
+      <option value="apply">apply</option>
+    </select>
+    <label><input type="checkbox" id="ctx-run-dirty"> Allow dirty</label>
+    <button onclick="ctxRun()">Run</button>
+  </div>
+  <div class="ctx-form">
+    <label>Scope</label>
+    <select id="ctx-docs-scope">
+      <option value="full">full</option>
+      <option value="changed">changed</option>
+    </select>
+    <button onclick="ctxDocs('impact')">Impact</button>
+    <button onclick="ctxDocs('update')">Update</button>
+  </div>
+  <div id="ctx-results" class="ctx-results">Results will appear here...</div>
 </div>
 <script>
 async function fetchJSON(url, options) {
@@ -460,6 +625,51 @@ async function loadAll() {
   const presetList = document.getElementById('presets-list');
   if (presets.error) { presetList.innerHTML = '<li class="error">' + presets.error + '</li>'; }
   else { presetList.innerHTML = presets.map(p => '<li>' + p.preset_id + '</li>').join(''); }
+}
+async function ctxAction(action) {
+  const path = document.getElementById('ctx-project-path').value || '.';
+  const results = document.getElementById('ctx-results');
+  results.textContent = 'Loading...';
+  const payload = { project_path: path };
+  if (action === 'verify' || action === 'status') {
+    payload.strict = false;
+  }
+  const data = await fetchJSON('/api/ctx/' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  results.textContent = data.error ? 'Error: ' + data.error : JSON.stringify(data, null, 2);
+}
+async function ctxRun() {
+  const path = document.getElementById('ctx-project-path').value || '.';
+  const scope = document.getElementById('ctx-run-scope').value;
+  const mode = document.getElementById('ctx-run-mode').value;
+  const dirty = document.getElementById('ctx-run-dirty').checked;
+  const results = document.getElementById('ctx-results');
+  results.textContent = 'Loading...';
+  const data = await fetchJSON('/api/ctx/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_path: path, scope: scope, write_mode: mode, allow_dirty: dirty })
+  });
+  results.textContent = data.error ? 'Error: ' + data.error : JSON.stringify(data, null, 2);
+}
+async function ctxDocs(action) {
+  const path = document.getElementById('ctx-project-path').value || '.';
+  const scope = document.getElementById('ctx-docs-scope').value;
+  const results = document.getElementById('ctx-results');
+  results.textContent = 'Loading...';
+  const body = { project_path: path, scope: scope };
+  if (action === 'update') {
+    body.write_mode = 'patch';
+  }
+  const data = await fetchJSON('/api/ctx/public-docs/' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  results.textContent = data.error ? 'Error: ' + data.error : JSON.stringify(data, null, 2);
 }
 loadAll();
 </script>

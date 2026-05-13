@@ -29,6 +29,10 @@ from tools.registry import ToolRegistry
 from interfaces.api_server.auth import verify_api_key
 from interfaces.api_server.rate_limit import RateLimiter
 
+from agentheim.context_ops_impl import AictxContextOps
+from agentheim.vendor.aictx.config import AictxConfig
+from agentheim.vendor.aictx.errors import SafetyError
+
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------
@@ -128,6 +132,78 @@ class RunStatusResponse(BaseModel):
     error: str | None = None
 
 
+class CtxInitRequest(BaseModel):
+    project: str = "."
+
+
+class CtxRunRequest(BaseModel):
+    project: str = "."
+    scope: str = "full"
+    write_mode: str = "patch"
+    allow_dirty: bool = False
+
+
+class CtxVerifyRequest(BaseModel):
+    project: str = "."
+    strict: bool = False
+
+
+class CtxStatusRequest(BaseModel):
+    project: str = "."
+    strict: bool = False
+
+
+class CtxCleanRequest(BaseModel):
+    project: str = "."
+    run_id: str | None = None
+    keep_runs: int | None = None
+
+
+class CtxPublicDocsImpactRequest(BaseModel):
+    project: str = "."
+    scope: str = "full"
+
+
+class CtxPublicDocsUpdateRequest(BaseModel):
+    project: str = "."
+    scope: str = "changed"
+    write_mode: str = "patch"
+
+
+class CtxRunResponse(BaseModel):
+    run_id: str
+    generated_files: list[str]
+    patch_text: str
+    timing: dict
+    entropy: dict
+
+
+class CtxVerifyResponse(BaseModel):
+    result: str
+    is_pass: bool
+
+
+class CtxStatusResponse(BaseModel):
+    is_stale: bool
+    stale_sources: list[str]
+    missing_sources: list[str]
+    next_command: str | None
+
+
+class CtxCleanResponse(BaseModel):
+    removed_count: int
+    kept_count: int
+    removed_paths: list[str]
+
+
+class CtxPublicDocsImpactResponse(BaseModel):
+    entries: list[dict]
+
+
+class CtxPublicDocsUpdateResponse(BaseModel):
+    patch_path: str | None
+
+
 # ------------------------------------------------------------------
 # App factory
 # ------------------------------------------------------------------
@@ -222,6 +298,17 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             return True, None
         except Exception as exc:
             return False, str(exc)
+
+    def _get_ops(config=None):
+        cfg = config if config is not None else AictxConfig()
+        return AictxContextOps(cfg)
+
+    def _ctx_exc(exc: Exception) -> None:
+        if isinstance(exc, ValueError):
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if isinstance(exc, SafetyError):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     # ------------------------------------------------------------------
     # Routes
@@ -514,6 +601,100 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         from monitoring.metrics import MetricsCollector
         collector = MetricsCollector()
         return collector.get_prometheus_metrics()
+
+    @app.post("/api/ctx/init", tags=["ctx"])
+    def ctx_init(request: CtxInitRequest):
+        ops = _get_ops()
+        try:
+            ops.init(Path(request.project).resolve())
+        except Exception as exc:
+            _ctx_exc(exc)
+        return {"status": "ok"}
+
+    @app.post("/api/ctx/run", response_model=CtxRunResponse, tags=["ctx"])
+    def ctx_run(request: CtxRunRequest):
+        import uuid
+        ops = _get_ops()
+        run_id = f"api-ctx-{uuid.uuid4().hex[:8]}"
+        try:
+            report = ops.run_pipeline(
+                repo_root=Path(request.project).resolve(),
+                run_id=run_id,
+                scope=request.scope,
+                write_mode=request.write_mode,
+                allow_dirty=request.allow_dirty,
+            )
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxRunResponse(
+            run_id=run_id,
+            generated_files=report.generated_files or [],
+            patch_text=report.patch_text or "",
+            timing=report.timing or {},
+            entropy=report.entropy or {},
+        )
+
+    @app.post("/api/ctx/verify", response_model=CtxVerifyResponse, tags=["ctx"])
+    def ctx_verify(request: CtxVerifyRequest):
+        ops = _get_ops()
+        try:
+            result = ops.verify(Path(request.project).resolve(), strict=request.strict)
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxVerifyResponse(result=result.result, is_pass=result.is_pass)
+
+    @app.post("/api/ctx/status", response_model=CtxStatusResponse, tags=["ctx"])
+    def ctx_status(request: CtxStatusRequest):
+        ops = _get_ops()
+        try:
+            result = ops.status(Path(request.project).resolve(), strict=request.strict)
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxStatusResponse(
+            is_stale=result.is_stale,
+            stale_sources=result.stale_sources or [],
+            missing_sources=result.missing_sources or [],
+            next_command=result.next_command,
+        )
+
+    @app.post("/api/ctx/clean", response_model=CtxCleanResponse, tags=["ctx"])
+    def ctx_clean(request: CtxCleanRequest):
+        ops = _get_ops()
+        try:
+            result = ops.clean(
+                Path(request.project).resolve(),
+                run_id=request.run_id,
+                keep_runs=request.keep_runs,
+            )
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxCleanResponse(
+            removed_count=result.removed_count,
+            kept_count=result.kept_count,
+            removed_paths=result.removed_paths or [],
+        )
+
+    @app.post("/api/ctx/public-docs/impact", response_model=CtxPublicDocsImpactResponse, tags=["ctx"])
+    def ctx_public_docs_impact(request: CtxPublicDocsImpactRequest):
+        ops = _get_ops()
+        try:
+            result = ops.public_docs_impact(Path(request.project).resolve(), scope=request.scope)
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxPublicDocsImpactResponse(entries=result.entries or [])
+
+    @app.post("/api/ctx/public-docs/update", response_model=CtxPublicDocsUpdateResponse, tags=["ctx"])
+    def ctx_public_docs_update(request: CtxPublicDocsUpdateRequest):
+        ops = _get_ops()
+        try:
+            path = ops.public_docs_update(
+                Path(request.project).resolve(),
+                scope=request.scope,
+                write_mode=request.write_mode,
+            )
+        except Exception as exc:
+            _ctx_exc(exc)
+        return CtxPublicDocsUpdateResponse(patch_path=str(path) if path else None)
 
     @app.websocket("/api/runs/{run_id}/ws")
     async def websocket_run_status(websocket: WebSocket, run_id: str):

@@ -153,6 +153,14 @@ class RunLedger:
             self._sequence += 1
             return event
 
+    def append_event(
+        self,
+        event_type: EventType,
+        payload: dict[str, Any],
+    ) -> Event:
+        """Convenience alias for emit_event with a positional event_type and payload."""
+        return self.emit_event(event_type, payload=payload)
+
     def read_ledger(self) -> list[Event]:
         """Read all events from the unified ledger."""
         path = self.run_dir / "ledger.jsonl"

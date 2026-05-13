@@ -78,8 +78,9 @@ class ResearchWorkflow(Workflow):
 
     def execute_step(self, step: Step, context: StepContext) -> StepResult:
         topic = context.metadata.get("topic", "")
+        shards = context.metadata.get("context_shards", {})
         if step.id == "gather":
-            agent_result = self._gatherer.run_gather(topic)
+            agent_result = self._gatherer.run_gather(topic, context_shards=shards)
             return StepResult(
                 step_id=step.id,
                 success=agent_result.success,
@@ -89,7 +90,7 @@ class ResearchWorkflow(Workflow):
         elif step.id == "summarize":
             gather_meta = context.prior_results.get("gather")
             gather_parsed = gather_meta.metadata.get("parsed", {}) if gather_meta else {}
-            agent_result = self._summarizer.run_summarize(topic, gather_parsed)
+            agent_result = self._summarizer.run_summarize(topic, gather_parsed, context_shards=shards)
             return StepResult(
                 step_id=step.id,
                 success=agent_result.success,
@@ -99,7 +100,7 @@ class ResearchWorkflow(Workflow):
         elif step.id == "report":
             summary_meta = context.prior_results.get("summarize")
             summary_parsed = summary_meta.metadata.get("parsed", {}) if summary_meta else {}
-            agent_result = self._reporter.run_report(topic, summary_parsed)
+            agent_result = self._reporter.run_report(topic, summary_parsed, context_shards=shards)
             return StepResult(
                 step_id=step.id,
                 success=agent_result.success,

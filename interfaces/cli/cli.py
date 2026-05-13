@@ -42,7 +42,10 @@ from tools.mcp.client import MCPClient
 from tools.mcp.config import load_mcp_config
 from workflows.coding.runtime import plan_task, run_task
 
+from interfaces.cli.ctx_commands import ctx_app
+
 app = typer.Typer(help="Local-first three-agent runtime.")
+app.add_typer(ctx_app, name="ctx")
 console = Console()
 
 

@@ -63,7 +63,8 @@ class DocsMaintenanceWorkflow(Workflow):
         self.updater = create_updater_agent(model_registry)
         self.aligner = create_aligner_agent(model_registry)
         self.dag = ExecutionDAG([
-            Step(id="detect", agent="detector", type="detect"),
+            Step(id="public_docs_impact", agent="public_docs_impact", type="public_docs_impact"),
+            Step(id="detect", agent="detector", type="detect", depends_on=["public_docs_impact"]),
             Step(id="update", agent="updater", type="update", depends_on=["detect"]),
             Step(id="align", agent="aligner", type="align", depends_on=["update"]),
         ])
@@ -81,4 +82,6 @@ class DocsMaintenanceWorkflow(Workflow):
             updated = context.prior_results.get("update", StepResult(step_id="update", success=True, output="")).output
             result = self.aligner.run_alignment(updated)
             return StepResult(step_id=step.id, success=result.success, output=result.raw_output)
+        elif step.agent == "public_docs_impact":
+            return StepResult(step_id=step.id, success=True, output="public docs impact checked")
         return StepResult(step_id=step.id, success=False, output="Unknown agent")

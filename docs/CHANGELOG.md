@@ -2,6 +2,22 @@
 
 ## 2026-05-13
 
+### AICtx Integration — M3-M5 Complete
+- Added `agentheim ctx` CLI namespace with 8 commands: init, scan, run, verify, status, clean, public-docs impact, public-docs update (`interfaces/cli/ctx_commands.py`)
+- Added API server routes under `/api/ctx/*` for all context operations (`interfaces/api_server/app.py`)
+- Added Web UI context operations section with dashboard controls (`interfaces/web_ui/app.py`)
+- Created `context-maintainer` workflow pack with full DAG (scan → plan → generate → write → verify + public_docs_impact → produce_report) (`workflows/context_maintainer/`)
+- Created `context-maintainer` preset with guided questions for scope, write mode, project path (`presets/context_maintainer.py`)
+- Added context operation event types to `core/events.py`: CONTEXT_INITIALIZED, CONTEXT_SCANNED, CONTEXT_PLANNED, CONTEXT_GENERATED, CONTEXT_WRITTEN, CONTEXT_VERIFIED, CONTEXT_STALE_DETECTED, PUBLIC_DOCS_IMPACT_MAPPED, PUBLIC_DOCS_UPDATED
+- Added `ArtifactStore` methods for context run reports, lockfiles, and public docs impact
+- Added `ContextRunLedger` helper for emitting context events to ledgers (`agentheim/context_run_ledger.py`)
+- Made coding workflow context-aware: uses AICtx pipeline with fallback to legacy `build_context_pack` (`workflows/coding/runtime.py`)
+- Made docs maintenance workflow context-aware with stale-context preflight and public-docs impact mapping (`workflows/docs_maintenance/runtime.py`)
+- Made research workflow context-aware with AICtx-derived shards (`workflows/research/runtime.py`)
+- Added stale-context preflight hook to `WorkflowRunner` with `stale_context_check` parameter and `context_fresh`/`context_stale` step conditions (`core/workflow_runner.py`)
+- Implemented review-first public-doc update path: patches generated but never auto-applied, workflow marks as "pending_review" (`workflows/docs_maintenance/runtime.py`)
+- Full suite: **638 passed**, 2 skipped, 1 unrelated playwright failure
+
 ### AICtx Integration — M2.5 Complete
 - Expanded `ContextOps` ABC with 4 new methods: `init()`, `clean()`, `run_pipeline()`, `public_docs_update()` (`agentheim/context_ops.py`)
 - Implemented all 11 methods in `AictxContextOps` (`agentheim/context_ops_impl.py`)

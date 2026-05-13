@@ -5,6 +5,7 @@ from presets.base import PRESET_REGISTRY, Preset, PresetRegistry, Question
 # Import side-effect: register all presets
 import presets.codebase_assistant
 import presets.command_assistant
+import presets.context_maintainer
 import presets.docs_maintainer
 import presets.file_organizer
 import presets.github_maintainer
@@ -18,6 +19,7 @@ __all__ = [
     "Question",
     "codebase_assistant",
     "command_assistant",
+    "context_maintainer",
     "docs_maintainer",
     "file_organizer",
     "github_maintainer",
