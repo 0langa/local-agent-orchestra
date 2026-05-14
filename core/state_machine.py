@@ -42,7 +42,7 @@ class RuntimeStateMachine:
         RuntimeState.FINAL_REPORT: {RuntimeState.RESUME_AVAILABLE, RuntimeState.DONE, RuntimeState.BLOCKED, RuntimeState.FAILED_AND_ROLLED_BACK},
         RuntimeState.RESUME_AVAILABLE: {RuntimeState.DONE, RuntimeState.BLOCKED, RuntimeState.FAILED_AND_ROLLED_BACK},
         RuntimeState.DONE: set(),
-        RuntimeState.BLOCKED: set(),
+        RuntimeState.BLOCKED: {RuntimeState.RESUME_AVAILABLE, RuntimeState.DONE},
         RuntimeState.FAILED_AND_ROLLED_BACK: set(),
     }
 

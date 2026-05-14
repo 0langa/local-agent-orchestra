@@ -22,6 +22,7 @@ from core.public_api import (
     EventType,
     ProviderError,
     PolicyEngine,
+    ResumeError,
     RunLedger,
     build_model_registry,
     ResumeOrchestrator,
@@ -294,7 +295,24 @@ def report(
     repo: str = typer.Option(..., "--repo", help="Target repository path."),
     run_id: str = typer.Option(..., "--run-id", help="Run id under .ai-team/runs."),
 ) -> None:
-    final_report = load_final_report(repo, run_id)
+    try:
+        final_report = load_final_report(repo, run_id)
+    except ResumeError:
+        # Plan runs don't produce final_report.json; show plan summary instead
+        run_dir = Path(repo) / ".ai-team" / "runs" / run_id
+        plan_json = run_dir / "plan.json"
+        if plan_json.exists():
+            plan = json.loads(plan_json.read_text(encoding="utf-8"))
+            console.print(f"[yellow]This was a plan run — no final report available.[/yellow]")
+            console.print(f"[bold]Plan summary:[/bold] {plan.get('summary', 'N/A')}")
+            console.print(f"[bold]Repo type:[/bold] {plan.get('detected_repo_type', 'N/A')}")
+            work_orders = plan.get('work_orders', [])
+            if work_orders:
+                console.print("[bold]Work orders:[/bold]")
+                for wo in work_orders:
+                    console.print(f"  - {wo.get('id', '?')}: {wo.get('title', 'N/A')}")
+            return
+        raise
     console.print(f"[bold]Status:[/bold] {final_report.status}")
     console.print(f"[bold]Task summary:[/bold] {final_report.task_summary}")
     console.print(f"[bold]Changed files:[/bold] {', '.join(final_report.changed_files) if final_report.changed_files else 'none'}")

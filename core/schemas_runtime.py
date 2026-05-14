@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field
 
 from config.config import ModelRole
 
@@ -63,7 +64,7 @@ class WorkOrder(BaseModel):
     forbidden_changes: list[str] = Field(default_factory=list)
     acceptance_criteria: list[AcceptanceCriterion] = Field(default_factory=list)
     expected_commands: list[list[str]] = Field(default_factory=list)
-    max_edit_scope: str = Field(min_length=1)
+    max_edit_scope: str = Field(default="")
 
 
 class TaskNode(BaseModel):
@@ -74,7 +75,7 @@ class TaskNode(BaseModel):
     title: str = Field(min_length=1)
     dependencies: list[str] = Field(default_factory=list)
     acceptance_criteria: list[AcceptanceCriterion] = Field(default_factory=list)
-    max_edit_scope: str = Field(min_length=1)
+    max_edit_scope: str = Field(default="")
     expected_verifier_commands: list[list[str]] = Field(default_factory=list)
     work_order: WorkOrder
 
@@ -130,20 +131,48 @@ class PatchPlan(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+def _ensure_list(value: object) -> list[str]:
+    """Normalize str → [str] or None → []."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return [str(value)]
+
+
+def _ensure_list_of_lists(value: object) -> list[list[str]]:
+    """Normalize mixed shapes into list[list[str]]."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [[value]]
+    if isinstance(value, list):
+        out: list[list[str]] = []
+        for item in value:
+            if isinstance(item, list):
+                out.append([str(v) for v in item])
+            else:
+                out.append([str(item)])
+        return out
+    return [[str(value)]]
+
+
 class VerificationReport(BaseModel):
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     work_order_id: str = Field(min_length=1, validation_alias=AliasChoices("work_order_id", "workOrderId"))
     status: str = Field(min_length=1)
-    commands_run: list[list[str]] = Field(default_factory=list, validation_alias=AliasChoices("commands_run", "commandsRun"))
-    passed_checks: list[str] = Field(default_factory=list, validation_alias=AliasChoices("passed_checks", "passedChecks"))
-    failed_checks: list[str] = Field(default_factory=list, validation_alias=AliasChoices("failed_checks", "failedChecks"))
-    diff_findings: list[str] = Field(default_factory=list, validation_alias=AliasChoices("diff_findings", "diffFindings"))
-    missing_tests: list[str] = Field(default_factory=list, validation_alias=AliasChoices("missing_tests", "missingTests"))
-    regressions: list[str] = Field(default_factory=list)
-    security_concerns: list[str] = Field(default_factory=list, validation_alias=AliasChoices("security_concerns", "securityConcerns"))
-    performance_concerns: list[str] = Field(default_factory=list, validation_alias=AliasChoices("performance_concerns", "performanceConcerns"))
-    fix_requests: list[str] = Field(default_factory=list, validation_alias=AliasChoices("fix_requests", "fixRequests"))
+    commands_run: Annotated[list[list[str]], BeforeValidator(_ensure_list_of_lists)] = Field(default_factory=list, validation_alias=AliasChoices("commands_run", "commandsRun"))
+    passed_checks: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("passed_checks", "passedChecks"))
+    failed_checks: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("failed_checks", "failedChecks"))
+    diff_findings: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("diff_findings", "diffFindings"))
+    missing_tests: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("missing_tests", "missingTests"))
+    regressions: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list)
+    security_concerns: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("security_concerns", "securityConcerns"))
+    performance_concerns: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("performance_concerns", "performanceConcerns"))
+    fix_requests: Annotated[list[str], BeforeValidator(_ensure_list)] = Field(default_factory=list, validation_alias=AliasChoices("fix_requests", "fixRequests"))
     final_summary: str = Field(default="", validation_alias=AliasChoices("final_summary", "finalSummary"))
 
 
