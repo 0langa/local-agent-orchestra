@@ -2,6 +2,13 @@
 
 ## 2026-05-15
 
+### Phase 4 Slice — Documents Workflow Edge-Case Readiness
+- Added `TestDocumentsWorkflowExecution` with end-to-end and empty-repo fallback tests.
+- Added `TestDocumentsCollectTextFiles` proving binary suffixes (`.png`, `.exe`) and excluded directories (`.git`, `node_modules`) are skipped by `_collect_text_files`.
+- Empty repo gracefully falls back through index → retrieve → answer without crashing.
+- Updated `docs/SUPPORT_MATRIX.md` `local-document-chat` known limits to reflect new coverage.
+- Validation: `tests/smoke/test_workflow_execution.py` 10 passed.
+
 ### Phase 3 Slice — Desktop UI Shell Parity Acknowledgment
 - Confirmed Desktop UI (`interfaces/desktop_ui/app.py`) is a pywebview wrapper around Web UI; canonical run summary parity is inherited from Web UI `/api/runs/{run_id}` route.
 - Updated `BASELINE-ROADMAP.md` Phase 3 to mark Desktop UI shell as implemented by architecture inheritance.

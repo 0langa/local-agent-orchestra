@@ -508,9 +508,9 @@ Promote these after focused gaps close:
    - coding patch rollback and verifier fix loop
    - coding max-total-tasks and max-diff guards
    - `run --no-tests` evidence
-   - documents binary/excluded-dir and empty-repo behavior
+   - 🟢 documents binary/excluded-dir and empty-repo behavior (smoke tests added 2026-05-15)
    - file organization missing/unsafe move reporting
-   - command assistant unsafe command returns `safe=false`
+   - 🟢 command assistant unsafe command returns `safe=false` (negative tests added 2026-05-15)
    - docs maintenance align/apply path
    - research API execution path
    - GitHub API execution path

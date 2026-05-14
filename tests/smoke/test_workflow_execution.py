@@ -181,3 +181,71 @@ class TestFileOrganizationWorkflowExecution:
         assert all(r.success for r in results)
         # Verify ledger has working_memory or file_changes
         assert (ledger.run_dir / "working_memory.json").exists()
+
+
+class TestDocumentsWorkflowExecution:
+    def test_documents_workflow_runs_end_to_end(self, mock_deps, tmp_path: Path) -> None:
+        from workflows.documents import DocumentsWorkflow
+        from workflows.documents.agents.base import BaseAgent
+        registry, tools, policy, ledger = mock_deps
+        (tmp_path / "README.md").write_text("# Hello\nThis is a test.", encoding="utf-8")
+        with patch.object(BaseAgent, "_invoke", _fake_invoke):
+            wf = DocumentsWorkflow(registry, tools, policy, ledger)
+            results = wf.run(tmp_path, metadata={"query": "hello"})
+
+        assert len(results) == 3
+        assert all(r.success for r in results)
+        # Verify answer step has parsed answer
+        answer_result = results[-1]
+        assert "parsed" in answer_result.metadata
+
+    def test_documents_workflow_empty_repo_fallback(self, mock_deps, tmp_path: Path) -> None:
+        from workflows.documents import DocumentsWorkflow
+        from workflows.documents.agents.base import BaseAgent
+        registry, tools, policy, ledger = mock_deps
+        # Empty repo — no files
+        with patch.object(BaseAgent, "_invoke", _fake_invoke):
+            wf = DocumentsWorkflow(registry, tools, policy, ledger)
+            results = wf.run(tmp_path, metadata={"query": "hello"})
+
+        assert len(results) == 3
+        # Index succeeds even with no files
+        assert results[0].success
+        # Retrieve succeeds
+        assert results[1].success
+        # Answer succeeds (may use fallback)
+        assert results[2].success
+        # Workflow should produce some answer metadata
+        assert "parsed" in results[2].metadata
+
+
+class TestDocumentsCollectTextFiles:
+    def test_excludes_binary_suffixes(self, tmp_path: Path) -> None:
+        from workflows.documents.workflows.documents import _collect_text_files
+        (tmp_path / "readme.md").write_text("text", encoding="utf-8")
+        (tmp_path / "image.png").write_bytes(b"\x89PNG")
+        (tmp_path / "app.exe").write_bytes(b"MZ")
+        files = _collect_text_files(tmp_path)
+        names = {p.name for p in files}
+        assert "readme.md" in names
+        assert "image.png" not in names
+        assert "app.exe" not in names
+
+    def test_excludes_directories(self, tmp_path: Path) -> None:
+        from workflows.documents.workflows.documents import _collect_text_files
+        (tmp_path / "src").mkdir(exist_ok=True)
+        (tmp_path / "src" / "main.py").write_text("print(1)", encoding="utf-8")
+        (tmp_path / ".git").mkdir(exist_ok=True)
+        (tmp_path / ".git" / "config").write_text("[core]", encoding="utf-8")
+        (tmp_path / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "node_modules" / "pkg" / "index.js").write_text("module.exports = {};", encoding="utf-8")
+        files = _collect_text_files(tmp_path)
+        names = {p.name for p in files}
+        assert "main.py" in names
+        assert "config" not in names
+        assert "index.js" not in names
+
+    def test_empty_repo_returns_empty(self, tmp_path: Path) -> None:
+        from workflows.documents.workflows.documents import _collect_text_files
+        files = _collect_text_files(tmp_path)
+        assert files == []
