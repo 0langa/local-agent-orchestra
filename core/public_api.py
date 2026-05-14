@@ -44,6 +44,36 @@ from core.resume import ResumeOrchestrator as ResumeOrchestrator
 from core.resume import list_runs as list_resume_runs
 from core.resume import load_final_report as load_final_report
 from core.resume import load_run as load_run
+from core.run_summary import (
+    ApprovalSummary as ApprovalSummary,
+)
+from core.run_summary import (
+    CanonicalRunSummary as CanonicalRunSummary,
+)
+from core.run_summary import (
+    ModelSelectionSummary as ModelSelectionSummary,
+)
+from core.run_summary import (
+    PolicyDecisionSummary as PolicyDecisionSummary,
+)
+from core.run_summary import (
+    RunErrorSummary as RunErrorSummary,
+)
+from core.run_summary import (
+    StateTransitionSummary as StateTransitionSummary,
+)
+from core.run_summary import (
+    ToolCountSummary as ToolCountSummary,
+)
+from core.run_summary import (
+    VerificationCheckSummary as VerificationCheckSummary,
+)
+from core.run_summary import (
+    VerificationSummary as VerificationSummary,
+)
+from core.run_summary import build_live_run_summary as build_live_run_summary
+from core.run_summary import build_run_summary as build_run_summary
+from core.run_summary import resolve_run_id as resolve_run_id
 
 # ─── Error classification & retry ───────────────────────────────────
 from core.error_classification import ErrorCategory as ErrorCategory
@@ -235,6 +265,18 @@ __all__ = [
     "list_resume_runs",
     "load_final_report",
     "load_run",
+    "ApprovalSummary",
+    "CanonicalRunSummary",
+    "ModelSelectionSummary",
+    "PolicyDecisionSummary",
+    "RunErrorSummary",
+    "StateTransitionSummary",
+    "ToolCountSummary",
+    "VerificationCheckSummary",
+    "VerificationSummary",
+    "build_live_run_summary",
+    "build_run_summary",
+    "resolve_run_id",
     # Error / retry
     "ErrorCategory",
     "classify_error",

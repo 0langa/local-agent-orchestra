@@ -2,6 +2,36 @@
 
 ## 2026-05-14
 
+### Phase 3 Slice — Canonical Run Summary Across CLI/API/Web
+- Added shared canonical run summary builder in [`core/run_summary.py`](../core/run_summary.py) that normalizes run status, summary text, duration, model selection, state transitions, tool/policy/approval counts, verification, artifacts, and actionable error guidance from ledger/events plus persisted artifacts.
+- Extended [`core/error_classification.py`](../core/error_classification.py) with `error_summary_from_text()` so persisted run failures can reuse the same troubleshooting guidance when only serialized error payloads remain.
+- Updated CLI/API/Web consumers to use the same payload:
+  - [`interfaces/cli/cli.py`](../interfaces/cli/cli.py) `report` now emits canonical run summary JSON
+  - [`interfaces/api_server/app.py`](../interfaces/api_server/app.py) `GET /api/runs/{run_id}` now returns the canonical summary
+  - API/Web SSE and WebSocket status streams now emit the same payload shape on initial/final status updates
+- Added/updated focused coverage in [`tests/test_resume.py`](../tests/test_resume.py), [`tests/test_api_server.py`](../tests/test_api_server.py), [`tests/test_web_ui.py`](../tests/test_web_ui.py), [`tests/smoke/test_cli.py`](../tests/smoke/test_cli.py), and [`tests/test_error_classification.py`](../tests/test_error_classification.py).
+- Updated [`BASELINE-ROADMAP.md`](../BASELINE-ROADMAP.md), [`docs/API_REFERENCE.md`](API_REFERENCE.md), [`docs/USER_GUIDE.md`](USER_GUIDE.md), and [`docs/TIER1_CONTRACTS.md`](TIER1_CONTRACTS.md) to reflect the implemented Phase 3 parity and remaining bundle/Desktop gaps.
+
+### Phase 1 Slice — API/Web Approval Continuation Flow
+- Added shared interface approval state in [`interfaces/tool_approval.py`](../interfaces/tool_approval.py) so API and Web UI medium-risk tool calls create ledger-backed approval requests and can continue safely after explicit approval.
+- Extended [`interfaces/api_server/app.py`](../interfaces/api_server/app.py) and [`interfaces/web_ui/app.py`](../interfaces/web_ui/app.py) with approval grant/deny routes for pending tool requests.
+- Focused tests now prove request, grant, deny, execution, and ledger event emission across API/Web flows in [`tests/test_api_server.py`](../tests/test_api_server.py) and [`tests/test_web_ui.py`](../tests/test_web_ui.py).
+- Updated roadmap and operator docs so Phase 1 now reflects the implemented approval continuation path.
+
+### Phase 2 Lane 3 — Localhost Compatibility Shim Evidence
+- Added a gitignored local helper wrapper at `.localtest/mock-ai-server/start-gpt54-mini-azure.ps1` to start the existing localhost Azure/OpenAI-compatible proxy with `gpt-5.4-mini` defaults.
+- Verified the localhost compatibility shim path with `powershell -ExecutionPolicy Bypass -File .\.localtest\mock-ai-server\start-gpt54-mini-azure.ps1 -Fake` and `python .\.localtest\mock-ai-server\smoke_agentheim_http_providers.py`.
+- Updated `BASELINE-ROADMAP.md`, `live-ai-testing.md`, and `docs/SUPPORT_MATRIX.md` to record this as partial evidence for self-hosted-shaped localhost configurations without overstating real OSS local-server validation.
+
+### Phase 7 Slice — Error Classification + Troubleshooting Hardening
+- Expanded `classify_error()` coverage in `core/error_classification.py` for Agentheim runtime errors and added provider message sub-classification for permission-denied, auth/config, rate-limit, timeout, and service-unavailable cases.
+- Enriched `error_summary()` in `core/error_classification.py` to include `retryable`, `halt`, `next_action`, and troubleshooting document/section hints so ledger/report consumers can surface actionable remediation links.
+- Added targeted tests in [`tests/test_error_classification.py`](../tests/test_error_classification.py) for Agentheim-specific exceptions, provider permission/error variants, and enriched error summary fields.
+- Expanded [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) with explicit remediation entries for provider auth failures, forbidden/permission-denied errors, transient provider outages/rate limits, run error-category triage, and older ledger resume/report compatibility.
+- Expanded `agentheim doctor` with role coverage, first-class lane readiness, localhost endpoint reachability, and ContextOps availability checks, and updated [`docs/USER_GUIDE.md`](USER_GUIDE.md) accordingly.
+- Updated [`monitoring/health.py`](../monitoring/health.py) to inspect the current lazy provider registry instead of a stale fixed provider list.
+
+
 ### Phase 2 Lane 1 — OpenAIV1Provider + AzureFoundryProvider Hardening
 - `OpenAIV1Provider` now supports `auth_mode="none"` by substituting `"no-key-required"` for the OpenAI client key (`providers/openai_v1.py`).
 - Added structured error classification: `_NON_RETRYABLE` (`AuthenticationError`, `PermissionDeniedError`, `BadRequestError`, `NotFoundError`, `UnprocessableEntityError`, `ConflictError`) raises `ProviderError` immediately; `_RETRYABLE` (`RateLimitError`, `APITimeoutError`, `APIConnectionError`, `InternalServerError`) follows existing retry/backoff logic (`providers/openai_v1.py`).

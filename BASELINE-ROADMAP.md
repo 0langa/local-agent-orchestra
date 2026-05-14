@@ -14,6 +14,13 @@ The roadmap is based on the current repository state, especially:
 - Workflow and preset registries in [`workflows/registry.py`](workflows/registry.py) and [`presets/__init__.py`](presets/__init__.py)
 - Live validation record in [`live-ai-testing.md`](live-ai-testing.md)
 
+## Status Legend
+
+- 🟢 done / strong evidence
+- 🟡 partial / needs more work or fresher proof
+- 🔴 not touched yet
+- ⚪ missing / not yet proven
+
 ## Baseline Goal
 
 Agentheim baseline is done when a new user can install the project, configure one first-class provider lane, run core presets from CLI and API, inspect/resume/report runs, and trust that every side effect is policy-gated, auditable, documented, and validated.
@@ -84,7 +91,7 @@ Phases are ordered by dependency. Do not expand product surface until earlier ga
 
 ---
 
-## Phase 0 - Roadmap Governance And Evidence Cleanup
+## 🟢 Phase 0 - Roadmap Governance And Evidence Cleanup
 
 **Status:** Complete as of 2026-05-14. Evidence is now captured in `docs/SUPPORT_MATRIX.md`, `docs/TIER1_CONTRACTS.md`, `live-ai-testing.md`, `docs/DEV_TESTING.md`, and the `baseline` devtest mode.
 
@@ -150,9 +157,9 @@ python -m interfaces.cli.cli doctor --skip-connectivity
 
 ---
 
-## Phase 1 - Safety And Runtime Spine
+## 🟢 Phase 1 - Safety And Runtime Spine
 
-**Status:** Complete as of 2026-05-14. All user-facing interface tool invocations (API, Web UI, CLI copy) route through `ToolInvoker`. Operation-level filesystem risk resolves read/list/stat to none and write/copy to medium. CLI grants/denies interactively. Core no longer imports product-specific implementations (`agents.self_improving`, `monitoring`). State transitions emit canonical `STATE_TRANSITION` events. Safety docs describe actual behavior.
+**Status:** Complete as of 2026-05-14. All user-facing interface tool invocations (API, Web UI, CLI copy) route through `ToolInvoker`. Operation-level filesystem risk resolves read/list/stat to none and write/copy to medium. CLI grants/denies interactively. API and Web UI now expose explicit approval grant/deny continuation routes for medium-risk operations, and those flows are covered by tests with ledger proof. Core no longer imports product-specific implementations (`agents.self_improving`, `monitoring`). State transitions emit canonical `STATE_TRANSITION` events. Safety docs describe actual behavior.
 
 **Goal:** Ensure every side effect flows through one policy-gated, ledger-audited path.
 
@@ -180,7 +187,7 @@ python -m interfaces.cli.cli doctor --skip-connectivity
    - shell and network retain strict sandbox/policy enforcement
 4. Wire approval UX minimally:
    - CLI can grant/deny when policy returns `ask`
-   - API returns an approval request payload instead of silently running or hard-blocking medium operations
+   - API/Web return an approval request payload and expose explicit grant/deny continuation routes
    - ledger records request and decision
 5. Move core side dependencies outward:
    - remove `agents.self_improving` and monitoring-specific imports from core runtime paths
@@ -227,35 +234,35 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ---
 
-## Phase 2 - Provider Lanes
+## 🟡 Phase 2 - Provider Lanes
 
 **Goal:** Make the top 3 provider lanes polished, documented, and empirically proven.
 
 **Why:** Provider setup is the first real product hurdle. Broad adapter lists are less valuable than three excellent paths.
 
-### Lane 1: OpenAI-Compatible, Including Azure
+### 🟢 Lane 1: OpenAI-Compatible, Including Azure
 
 **Decision:** This is the default first-class provider lane. Keep Chat Completions as the compatibility baseline. Add newer APIs or Azure variants behind capability switches instead of forcing every endpoint into one behavior.
 
 #### Work
 
-1. Harden `OpenAIV1Provider`:
-   - omit auth header/client key behavior for `auth_mode="none"` where possible
-   - support compatible max-token field variants where required
-   - normalize empty content as a provider failure when structured output is required
-   - expose clear retry/auth/rate-limit/timeout errors
-2. Harden `AzureFoundryProvider`:
-   - keep `/openai/v1` normalized path as primary
-   - document deployment/model naming expectations
-   - add bearer/Entra path only if implemented and tested
-   - add clear errors for wrong endpoint, wrong deployment, auth failure, and unsupported model capability
-3. Add local/self-hosted templates under the OpenAI-compatible lane:
-   - Ollama local
-   - LM Studio
-   - vLLM
-   - TGI
-   - llama.cpp server
-   - generic cloud VM endpoint with bearer auth
+1. 🟢 Harden `OpenAIV1Provider`:
+   - 🟢 omit auth header/client key behavior for `auth_mode="none"` where possible
+   - 🟢 support compatible max-token field variants where required
+   - 🟢 normalize empty content as a provider failure when structured output is required
+   - 🟢 expose clear retry/auth/rate-limit/timeout errors
+2. 🟢 Harden `AzureFoundryProvider`:
+   - 🟢 keep `/openai/v1` normalized path as primary
+   - 🟢 document deployment/model naming expectations
+   - ⚪ add bearer/Entra path only if implemented and tested
+   - 🟢 add clear errors for wrong endpoint, wrong deployment, auth failure, and unsupported model capability
+3. 🟢 Add local/self-hosted templates under the OpenAI-compatible lane:
+   - 🟢 Ollama local
+   - 🟢 LM Studio
+   - 🟢 vLLM
+   - 🟢 TGI
+   - 🟢 llama.cpp server
+   - 🟢 generic cloud VM endpoint with bearer auth
 4. Keep advanced OpenAI-compatible providers listed as advanced:
    - Groq
    - OpenRouter
@@ -280,30 +287,32 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 - Azure Foundry passes `provider test`, `ping-models`, and at least coding or command-assistant live path.
 - Ollama or LM Studio passes local planner/executor/verifier smoke where model capability is sufficient.
 
-### Lane 2: Google AI Services
+### 🟡 Lane 2: Google AI Services
 
 **Decision:** Gemini API and Vertex AI stay as native Google adapters, not OpenAI-compatible shims.
 
 #### Work
 
-1. Share request mapping logic between Gemini API and Vertex AI where possible.
-2. Support text and JSON output reliably before claiming tools/streaming.
-3. Fix vision input mapping:
-   - support data URL/base64 inline image paths where Google API allows it
-   - support file URI only where explicitly documented
-4. Add Vertex setup UX:
-   - ADC requirement
-   - project ID
-   - location
-   - model name
-   - permissions failure guidance
-5. Add retry/error wrapping parity with other providers.
-6. Add Google live validation:
-   - Gemini API key path
-   - Vertex ADC path
-   - text
-   - structured JSON
-   - vision when configured
+1. 🟢 Share request mapping logic between Gemini API and Vertex AI where possible.
+2. 🟢 Support text and JSON output reliably before claiming tools/streaming.
+3. 🟢 Fix vision input mapping:
+   - 🟢 support data URL/base64 inline image paths where Google API allows it
+   - 🟢 support file URI only where explicitly documented
+4. 🟢 Add Vertex setup UX:
+   - 🟢 ADC requirement
+   - 🟢 project ID
+   - 🟢 location
+   - 🟢 model name
+   - 🟢 permissions failure guidance
+5. 🟢 Add retry/error wrapping parity with other providers.
+6. 🟡 Add Google live validation:
+   - 🟢 Gemini API key path
+   - ⚪ Vertex ADC path
+   - 🟢 text
+   - 🟢 structured JSON
+   - ⚪ vision when configured
+
+**Status note (2026-05-14):** Fresh Gemini API live evidence now proves the API-key path, provider smoke, and tiny text/JSON connectivity with `gemini-live` against `gemini-2.5-flash` via `provider test` and `ping-models`. Vertex ADC and Google vision remain unproven in the current sweep. A stable-preset end-to-end Gemini run was attempted and advanced farther after temporarily adding planner `plan`, but it still stops before success because the temporary `gemini-live` profile does not provide an executor binding with `code_edit`. Default profile was restored to `azure-real` immediately after the attempt.
 
 #### Gates
 
@@ -311,31 +320,33 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 - Vertex AI passes provider test with ADC and one stable preset.
 - Gemini or Vertex vision path passes `multimodal.image` describe and OCR if the chosen model declares vision.
 
-### Lane 3: Self-Hosted Open Source Models
+### 🟡 Lane 3: Self-Hosted Open Source Models
 
 **Decision:** Self-hosted support is first-class through OpenAI-compatible endpoints first. Do not build a separate local-model provider zoo until this path is reliable.
 
+**Status note (2026-05-14):** Localhost compatibility path is now partially proven via `.localtest/mock-ai-server/`, including a localhost Azure/OpenAI-compatible proxy shim and generated local profiles. This validates localhost endpoint wiring, profile/role binding, and request/response flow through self-hosted-shaped configurations, but it does **not** yet replace fresh evidence from a real Ollama, LM Studio, vLLM, TGI, or llama.cpp server.
+
 #### Work
 
-1. Add templates and docs for:
-   - Ollama local
-   - LM Studio
-   - vLLM
-   - TGI
-   - llama.cpp server
-   - remote VM endpoint with bearer auth
-2. Add model quality guidance:
-   - small models may pass command-assistant but fail coding
-   - coding preset requires stronger instruction-following and patch quality
-   - vision requires explicit vision capability
-3. Add model discovery where low-risk:
+1. 🟢 Add templates and docs for:
+   - 🟢 Ollama local
+   - 🟢 LM Studio
+   - 🟢 vLLM
+   - 🟢 TGI
+   - 🟢 llama.cpp server
+   - 🟢 remote VM endpoint with bearer auth
+2. 🟢 Add model quality guidance:
+   - 🟢 small models may pass command-assistant but fail coding
+   - 🟢 coding preset requires stronger instruction-following and patch quality
+   - 🟢 vision requires explicit vision capability
+3. ⚪ Add model discovery where low-risk:
    - `/v1/models` for compatible endpoints
    - clear fallback when not supported
-4. Add local lane live matrix:
-   - service running
-   - endpoint reachable
-   - planner/executor/verifier roles bound
-   - stable preset outcome
+4. 🟡 Add local lane live matrix:
+   - 🟢 service running
+   - 🟢 endpoint reachable
+   - 🟢 planner/executor/verifier roles bound
+   - ⚪ stable preset outcome
 
 #### Gates
 
@@ -343,22 +354,22 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 - At least one local/self-hosted endpoint passes a stable non-coding preset.
 - Docs clearly explain expected limitations for smaller OSS models.
 
-### Cross-Provider Work
+### 🟢 Cross-Provider Work
 
-1. Align `providers/__init__.py` lazy metadata with `DEFAULT_PROVIDER_MAP` or make one source authoritative.
-2. Make provider template capabilities conservative:
-   - do not claim streaming/tools/vision unless implemented and tested
-   - separate declared potential from proven support
-3. Add provider capability tests:
-   - text
-   - JSON
-   - vision
-   - auth failure
-   - timeout/retry
-   - rate-limit/quota
-   - empty content
-   - non-JSON content for structured agents
-4. Update provider docs and troubleshooting catalog.
+1. 🟢 Align `providers/__init__.py` lazy metadata with `DEFAULT_PROVIDER_MAP` or make one source authoritative.
+2. 🟢 Make provider template capabilities conservative:
+   - 🟢 do not claim streaming/tools/vision unless implemented and tested
+   - 🟢 separate declared potential from proven support
+3. 🟢 Add provider capability tests:
+   - 🟢 text
+   - 🟢 JSON
+   - 🟢 vision
+   - 🟢 auth failure
+   - 🟢 timeout/retry
+   - 🟢 rate-limit/quota
+   - 🟢 empty content
+   - 🟢 non-JSON content for structured agents
+4. 🟢 Update provider docs and troubleshooting catalog.
 
 ### Files
 
@@ -403,7 +414,9 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
 
 ---
 
-## Phase 3 - Run Diagnostics And Observability
+## 🟡 Phase 3 - Run Diagnostics And Observability
+
+**Status:** Partial as of 2026-05-14. Canonical run summary is now implemented across CLI `report`, `GET /api/runs/{run_id}`, and API/Web SSE/WebSocket final status payloads. Remaining gaps: the failed-run diagnostics bundle (`run_summary.json`, `diagnostics.md`) is not written yet, and Desktop UI shell parity is still pending.
 
 **Goal:** Make every run explainable from one canonical summary.
 
@@ -427,13 +440,15 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
    - error category
    - next recommended action
 2. Build summary from ledger and artifacts, not side-channel state.
+   - Implemented for persisted runs in `core/run_summary.py`
 3. Use the same summary in:
-   - `agentheim report`
-   - `GET /api/runs/{run_id}`
-   - SSE/WebSocket final events
-   - Web UI run detail
-   - Desktop UI shell
+   - `agentheim report` 🟢
+   - `GET /api/runs/{run_id}` 🟢
+   - SSE/WebSocket final events 🟢
+   - Web UI run detail 🟢
+   - Desktop UI shell ⚪
 4. Add failed-run diagnostics bundle:
+   - Status: ⚪ pending
    - `run_summary.json`
    - `diagnostics.md`
    - redacted provider error
@@ -441,16 +456,16 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
    - verification tail
    - troubleshooting links
 5. Improve error classification:
-   - provider auth/config
-   - provider rate limit/quota
-   - network timeout
-   - invalid model
-   - policy denial
-   - privacy restriction
-   - budget exceeded
-   - path confinement
-   - patch failure
-   - malformed model output
+   - 🟢 provider auth/config
+   - 🟢 provider rate limit/quota
+   - 🟢 network timeout
+   - 🟢 invalid model
+   - 🟢 policy denial
+   - 🟢 privacy restriction
+   - 🟢 budget exceeded
+   - 🟢 path confinement
+   - 🟢 patch failure
+   - 🟢 malformed model output
 
 ### Files
 
@@ -472,7 +487,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
 
 ### Done When
 
-- CLI/API/Web UI report the same status and artifact list for the same run.
+- CLI/API/Web UI report the same canonical summary for the same run.
 - Failed runs include actionable error category and next-step guidance.
 - Resume/report work for all stable workflows and presets.
 - Historical ledgers either load or fail with a clear compatibility message.
@@ -486,7 +501,7 @@ python -m interfaces.cli.cli list-runs --repo .
 
 ---
 
-## Phase 4 - Stable Workflow And Preset Set
+## 🔴 Phase 4 - Stable Workflow And Preset Set
 
 **Goal:** Promote a small, proven set of workflows/presets to stable and label the rest honestly.
 
@@ -576,7 +591,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ---
 
-## Phase 5 - Interface Contract Freeze
+## 🔴 Phase 5 - Interface Contract Freeze
 
 **Goal:** Make CLI, API, Web UI, Desktop, and Guided TUI consistent for Tier-1 journeys.
 
@@ -625,7 +640,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
    - workflow registry vs API workflow list
    - CLI command list vs docs
    - API OpenAPI paths vs docs
-   - same run summary across CLI/API/Web
+   - same run summary across CLI/API/Web 🟢
 6. Promote Web UI/Desktop only after browser smoke:
    - root loads
    - provider health visible
@@ -672,7 +687,7 @@ python -m interfaces.cli.cli copy --help
 
 ---
 
-## Phase 6 - Live Validation Program
+## 🔴 Phase 6 - Live Validation Program
 
 **Goal:** Make live evidence repeatable, bounded, and safe.
 
@@ -779,7 +794,9 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
 
 ---
 
-## Phase 7 - Troubleshooting And Operator Experience
+## 🟡 Phase 7 - Troubleshooting And Operator Experience
+
+**Status:** Mostly complete as of 2026-05-14. CLI/operator guidance, troubleshooting coverage, and doctor checks now cover the main baseline failure lanes. Remaining gap: Web/Desktop still do not present the same diagnostics surface instead of raw route/server errors.
 
 **Goal:** Make common failures self-service.
 
@@ -788,29 +805,29 @@ powershell -ExecutionPolicy Bypass -File .\devtest\ai_test.ps1
 ### Work
 
 1. Expand troubleshooting catalog:
-   - provider auth/config
-   - provider endpoint/model mismatch
-   - Google ADC/project/location failure
-   - local provider not running
-   - policy denial
-   - approval required
-   - privacy restriction
-   - path confinement
-   - budget exceeded
-   - timeout/retry exhausted
-   - malformed model output
-   - stale context
-   - resume/report compatibility
-2. Link runtime errors to troubleshooting entries.
-3. Add exact recovery commands.
-4. Add `doctor` checks for:
-   - provider profile presence
-   - role coverage
-   - first-class lane readiness
-   - local endpoint reachability where relevant
-   - optional dependencies
-   - AICtx/ContextOps availability
-5. Make Web/Desktop show diagnostics, not raw stack traces.
+   - 🟢 provider auth/config
+   - 🟢 provider endpoint/model mismatch
+   - 🟢 Google ADC/project/location failure
+   - 🟢 local provider not running
+   - 🟢 policy denial
+   - 🟢 approval required
+   - 🟢 privacy restriction
+   - 🟢 path confinement
+   - 🟢 budget exceeded
+   - 🟢 timeout/retry exhausted
+   - 🟢 malformed model output
+   - 🟢 stale context
+   - 🟢 resume/report compatibility
+2. 🟢 Link runtime errors to troubleshooting entries.
+3. 🟢 Add exact recovery commands.
+4. 🟢 Add `doctor` checks for:
+   - 🟢 provider profile presence
+   - 🟢 role coverage
+   - 🟢 first-class lane readiness
+   - 🟢 local endpoint reachability where relevant
+   - 🟢 optional dependencies
+   - 🟢 AICtx/ContextOps availability
+5. ⚪ Make Web/Desktop show diagnostics, not raw stack traces.
 
 ### Files
 
@@ -840,7 +857,7 @@ python -m interfaces.cli.cli doctor --skip-connectivity
 
 ---
 
-## Phase 8 - Advanced Subsystem Decisions
+## 🔴 Phase 8 - Advanced Subsystem Decisions
 
 **Goal:** Stop ambiguous semi-support for expensive subsystems.
 
@@ -902,7 +919,7 @@ python scripts/check-agent-instructions.py
 
 ---
 
-## Phase 9 - Baseline Release Gate
+## 🔴 Phase 9 - Baseline Release Gate
 
 **Goal:** Declare the baseline reliable enough to build on.
 

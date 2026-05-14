@@ -11,11 +11,14 @@ from pydantic import BaseModel, Field
 
 from config.config import list_provider_templates, load_profiles_document
 from core.public_api import (
+    CanonicalRunSummary,
     RunExecutor,
     RunRecord,
     RunStatus,
     ToolContext,
     ToolInvoker,
+    build_live_run_summary,
+    build_run_summary,
     build_model_registry,
     interface_policy_config,
     list_workflows as cap_list_workflows,
@@ -25,6 +28,7 @@ from tools.registry import ToolRegistry, create_core_tool_registry
 
 from agentheim.context_ops_impl import AictxContextOps
 from agentheim.vendor.aictx.config import AictxConfig
+from interfaces.tool_approval import InterfaceApprovalStore
 
 
 # ------------------------------------------------------------------
@@ -53,6 +57,18 @@ class ToolInvokeResponse(BaseModel):
     error: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     requires_approval: bool = False
+    policy: dict[str, Any] | None = None
+    approval_request: dict[str, Any] | None = None
+
+
+class ApprovalDecisionResponse(BaseModel):
+    success: bool
+    status: str
+    request_id: str
+    tool_id: str | None = None
+    data: Any = None
+    error: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     policy: dict[str, Any] | None = None
 
 
@@ -102,13 +118,6 @@ class MemoryWriteResponse(BaseModel):
     scope: str
     key: str
     status: str = "written"
-
-
-class RunStatusResponse(BaseModel):
-    run_id: str
-    status: str
-    artifacts: list[str] = Field(default_factory=list)
-    error: str | None = None
 
 
 class CtxInitRequest(BaseModel):
@@ -169,6 +178,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     tool_registry = ToolRegistry(repo_root)
     core_tool_registry = create_core_tool_registry(repo_root)
     tool_invoker = ToolInvoker(registry=core_tool_registry, policy_config=interface_policy_config())
+    approval_store = InterfaceApprovalStore(repo_root, "web-tool-approval")
     memory_bus = MemoryBus(repo_root)
     run_executor = RunExecutor()
     from interfaces.run_hooks import register_default_run_hooks
@@ -198,6 +208,11 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             "override_possible": policy.override_possible,
             "metadata": policy.metadata,
         }
+
+    def _run_status_payload(run_id: str, record: RunRecord | None = None) -> CanonicalRunSummary:
+        if record is not None:
+            return build_live_run_summary(repo_root, run_id, record)
+        return build_run_summary(repo_root, run_id)
 
     @app.get("/", response_class=HTMLResponse)
     def root() -> str:
@@ -236,8 +251,16 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Tool '{body.tool_id}' not found")
 
         ctx = ToolContext(network_allowed=False, workspace=repo_root, allowed_paths=[str(repo_root)])
-        result = tool_invoker.invoke(body.tool_id, body.params, ctx)
+        ledger = approval_store.create_ledger(body.tool_id, interface_name="web")
+        result = tool_invoker.invoke(body.tool_id, body.params, ctx, ledger=ledger)
         if result.requires_approval:
+            approval_request = approval_store.add(
+                tool_id=body.tool_id,
+                params=body.params,
+                context=ctx,
+                ledger=ledger,
+                policy_decision=result.policy,
+            )
             return JSONResponse(
                 status_code=409,
                 content=ToolInvokeResponse(
@@ -246,6 +269,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
                     metadata=result.metadata or {},
                     requires_approval=True,
                     policy=_policy_to_dict(result.policy),
+                    approval_request=approval_request.to_dict(),
                 ).model_dump(),
             )
         if result.policy and result.policy.decision == "deny":
@@ -261,6 +285,37 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             metadata=result.metadata or {},
             requires_approval=result.requires_approval,
             policy=_policy_to_dict(result.policy),
+        )
+
+    @app.post("/api/tools/approvals/{request_id}/grant", response_model=ApprovalDecisionResponse)
+    def grant_tool_approval(request_id: str) -> ApprovalDecisionResponse:
+        granted = approval_store.grant(request_id, invoker=tool_invoker)
+        if granted is None:
+            raise HTTPException(status_code=404, detail=f"Approval request '{request_id}' not found")
+        approval_request, result = granted
+        return ApprovalDecisionResponse(
+            success=result.success,
+            status="granted",
+            request_id=request_id,
+            tool_id=approval_request.tool_id,
+            data=result.data,
+            error=result.error,
+            metadata=result.metadata or {},
+            policy=_policy_to_dict(result.policy),
+        )
+
+    @app.post("/api/tools/approvals/{request_id}/deny", response_model=ApprovalDecisionResponse)
+    def deny_tool_approval(request_id: str) -> ApprovalDecisionResponse:
+        denied = approval_store.deny(request_id)
+        if denied is None:
+            raise HTTPException(status_code=404, detail=f"Approval request '{request_id}' not found")
+        return ApprovalDecisionResponse(
+            success=False,
+            status="denied",
+            request_id=request_id,
+            tool_id=denied.tool_id,
+            error="approval_denied",
+            metadata={"target": denied.target, "risk_level": denied.risk_level.value},
         )
 
     @app.get("/api/workflows", response_model=list[WorkflowListItem])
@@ -359,25 +414,18 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         run_id = run_executor.submit(preset.run, body.inputs)
         return ExecuteResponse(run_id=run_id, status="pending")
 
-    @app.get("/api/runs/{run_id}", response_model=RunStatusResponse)
-    def get_run_status(run_id: str) -> RunStatusResponse:
+    @app.get("/api/runs/{run_id}", response_model=CanonicalRunSummary)
+    def get_run_status(run_id: str) -> CanonicalRunSummary:
         """Get the status of a run."""
         record = run_executor.get(run_id)
         if record is not None:
-            return RunStatusResponse(
-                run_id=run_id,
-                status=record.status.value,
-                artifacts=record.artifacts,
-                error=record.error,
-            )
+            return _run_status_payload(run_id, record)
 
         run_dir = repo_root / ".ai-team" / "runs" / run_id
         if not run_dir.exists():
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
-        artifacts = sorted(f.name for f in run_dir.iterdir() if f.is_file())
-        status_str = "completed" if (run_dir / "final_report.md").exists() else "in_progress"
-        return RunStatusResponse(run_id=run_id, status=status_str, artifacts=artifacts)
+        return _run_status_payload(run_id)
 
     @app.get("/api/runs/{run_id}/stream")
     def stream_run_status(run_id: str):
@@ -391,7 +439,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
         async def _event_generator():
             last_status = None
-            yield f"data: {json.dumps({'run_id': run_id, 'status': record.status.value})}\n\n"
+            yield f"data: {json.dumps(_run_status_payload(run_id, record).model_dump(mode='json'))}\n\n"
             for _ in range(3600):
                 await asyncio.sleep(1)
                 current = run_executor.get(run_id)
@@ -399,9 +447,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
                     break
                 if current.status.value != last_status:
                     last_status = current.status.value
-                    payload = {"run_id": run_id, "status": current.status.value, "artifacts": current.artifacts}
-                    if current.error:
-                        payload["error"] = current.error
+                    payload = _run_status_payload(run_id, current).model_dump(mode="json")
                     yield f"data: {json.dumps(payload)}\n\n"
                 if current.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     break
@@ -522,25 +568,13 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
         run_executor.subscribe(run_id, on_update)
         try:
-            await websocket.send_json(
-                {
-                    "run_id": run_id,
-                    "status": record.status.value,
-                    "artifacts": record.artifacts,
-                }
-            )
+            await websocket.send_json(_run_status_payload(run_id, record).model_dump(mode="json"))
             if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                 await websocket.close()
                 return
             while True:
                 record = await queue.get()
-                payload = {
-                    "run_id": run_id,
-                    "status": record.status.value,
-                    "artifacts": record.artifacts,
-                }
-                if record.error:
-                    payload["error"] = record.error
+                payload = _run_status_payload(run_id, record).model_dump(mode="json")
                 await websocket.send_json(payload)
                 if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     await websocket.close()

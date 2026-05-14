@@ -48,6 +48,27 @@ Historical model entries include `gpt-4.1`, `gpt-4.1-mini`, and `gpt-5.4`. Treat
 
 ---
 
+## Google Lane Fresh Evidence
+
+Recorded on 2026-05-14 using profile `gemini-live` with model `gemini-2.5-flash`.
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Gemini API key path | pass | `python -m interfaces.cli.cli provider test --profile gemini-live --role planner` |
+| Gemini text connectivity | pass | `python -m interfaces.cli.cli ping-models` after `python -m interfaces.cli.cli provider use gemini-live` |
+| Gemini structured JSON-capable provider path | pass | `gemini-live` was created with `text,json` capabilities and `provider test` passed against the live endpoint |
+| Gemini stable preset end-to-end | partial / blocked | after temporarily assigning planner capability `plan`, `python -m interfaces.cli.cli start command-assistant --input "command_description=print a tiny json object with keys status and source"` progressed into workflow execution but failed with `ValueError: No model for role='executor' with capability='code_edit'`; default profile was then restored with `python -m interfaces.cli.cli provider use azure-real` |
+| Vertex ADC path | not tested | no fresh ADC-backed run in this sweep |
+| Google vision path | not tested | no fresh multimodal run in this sweep |
+
+Interpretation:
+
+- Fresh live evidence now proves the Gemini API-key path and tiny live request path.
+- This is enough to count `Gemini API key path`, `text`, and a minimal `structured JSON` provider path as freshly proven.
+- This is not yet enough to claim the full Google lane gate, because Vertex ADC, vision, and one stable preset end to end remain unproven.
+
+---
+
 ## Provider Lanes
 
 ### Harden First
@@ -61,6 +82,23 @@ Historical model entries include `gpt-4.1`, `gpt-4.1-mini`, and `gpt-5.4`. Treat
 ### Functional But Lower Polish Bar
 
 Other integrated providers should remain loadable and theoretically functional, but they do not block the baseline unless they break provider registry integrity, lazy loading, config parsing, or documented capability semantics.
+
+### Self-Hosted Localhost Compatibility Shim Evidence
+
+Recorded on 2026-05-14 using the gitignored local helper under `.localtest/mock-ai-server/`.
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Localhost Azure/OpenAI-compatible proxy startup | pass | `powershell -ExecutionPolicy Bypass -File .\.localtest\mock-ai-server\start-gpt54-mini-azure.ps1 -Fake` |
+| Generated local profile set | pass | `.localtest/mock-ai-server/make_agentheim_profiles.py` emitted 18 local mock profiles |
+| Localhost provider smoke through Agentheim provider configs | pass | `python .\.localtest\mock-ai-server\smoke_agentheim_http_providers.py` |
+
+Interpretation:
+
+- This is valid evidence that self-hosted-shaped localhost configuration paths work through Agentheim.
+- This proves endpoint wiring, profile generation, role binding, and request/response handling against a localhost endpoint.
+- This does **not** prove real OSS model quality or actual local-server quirks for Ollama, LM Studio, vLLM, TGI, or llama.cpp.
+- Keep the self-hosted lane as partial until at least one real local endpoint is rerun end-to-end.
 
 ---
 

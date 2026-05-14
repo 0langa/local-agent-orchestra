@@ -10,6 +10,7 @@ from core.events import EventType
 from core.ledger import RunLedger
 from core.policy_engine import PolicyEngine
 from core.resume import ResumeError, ResumeOrchestrator, list_runs, load_run
+from core.run_summary import build_run_summary
 from core.tool_protocol import ToolRegistry
 from core.workflow_runner import WorkflowRunner
 from workflows.base import ExecutionDAG, Step, StepResult, Workflow
@@ -66,6 +67,84 @@ class TestLoadRun:
     def test_missing_run_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ResumeError):
             load_run(tmp_path, "nonexistent")
+
+
+class TestCanonicalRunSummary:
+    def test_build_summary_from_final_report_and_ledger(self, tmp_path: Path) -> None:
+        ledger = RunLedger.create(tmp_path, "summary")
+        (ledger.run_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "run_id": ledger.run_dir.name,
+                    "workflow_id": "coding",
+                    "preset_id": "codebase-assistant",
+                    "created_at": "2026-05-14T10:00:00+00:00",
+                }
+            ),
+            encoding="utf-8",
+        )
+        ledger.emit_event(
+            EventType.RUN_INITIATED,
+            payload={"workflow_id": "coding", "repo_root": "${REPO_ROOT}"},
+        )
+        ledger.emit_event(
+            EventType.MODEL_SELECTED,
+            payload={"role": "planner", "model_id": "gemini-2.5-pro", "capability": "plan", "fallback_count": 0},
+        )
+        ledger.emit_event(
+            EventType.TOOL_CALLED,
+            tool_id="shell.execute",
+            payload={"command": ["pytest"]},
+        )
+        ledger.emit_event(
+            EventType.POLICY_EVALUATED,
+            tool_id="shell.execute",
+            payload={"decision": "allow"},
+        )
+        ledger.emit_event(
+            EventType.APPROVAL_REQUESTED,
+            tool_id="fs.write",
+            payload={"request_id": "req-1"},
+        )
+        ledger.emit_event(
+            EventType.APPROVAL_GRANTED,
+            tool_id="fs.write",
+            payload={"request_id": "req-1"},
+        )
+        ledger.emit_event(
+            EventType.STATE_TRANSITION,
+            step_id="verify",
+            payload={"from": "running", "to": "completed", "output_preview": "ok"},
+        )
+        ledger.write_json(
+            "final_report.json",
+            {
+                "run_id": ledger.run_dir.name,
+                "task_summary": "Fix flaky test",
+                "status": "done",
+                "tests": [{"name": "pytest", "status": "pass", "details": "1 passed", "command": ["pytest", "-q"]}],
+                "next_command_suggestions": ["python -m interfaces.cli.cli report --repo . --run-id x"],
+            },
+        )
+        (ledger.run_dir / "final_report.md").write_text("# Report", encoding="utf-8")
+
+        summary = build_run_summary(tmp_path, ledger.run_dir.name)
+
+        assert summary.run_id == ledger.run_dir.name
+        assert summary.workflow_id == "coding"
+        assert summary.preset_id == "codebase-assistant"
+        assert summary.status == "completed"
+        assert summary.summary == "Fix flaky test"
+        assert summary.repo_root == "${REPO_ROOT}"
+        assert summary.provider_models_by_role["planner"].model_id == "gemini-2.5-pro"
+        assert summary.tool_counts.total_calls == 1
+        assert summary.tool_counts.by_tool["shell.execute"] == 1
+        assert summary.policy_decisions.by_decision["allow"] == 1
+        assert summary.approvals.requested == 1
+        assert summary.approvals.granted == 1
+        assert summary.approvals.pending == 0
+        assert summary.verification.status == "passed"
+        assert "final_report.json" in summary.artifacts
 
 
 class TestResumeOrchestrator:

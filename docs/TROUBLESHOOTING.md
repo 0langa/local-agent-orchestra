@@ -85,6 +85,87 @@ Check that:
 - The provider secret was saved in keychain or encrypted vault
 - For local providers (Ollama, LM Studio), ensure the service is running
 
+### Provider authentication failed
+
+Typical symptoms:
+- `Authentication failed`
+- `invalid api key`
+- `unauthorized`
+- `credentials`
+
+Recovery:
+1. Run `agentheim doctor` and confirm provider profile loads.
+2. Re-enter or rotate the provider secret with `agentheim provider add` or `agentheim provider rotate-secret`.
+3. Confirm endpoint + auth mode match provider docs.
+4. Retry with `agentheim ping-models`.
+5. If the CLI `doctor` table shows a failed or warning provider profile row, fix that first.
+
+### Provider permission denied / forbidden
+
+Typical symptoms:
+- `Permission denied`
+- `403 forbidden`
+- `access denied`
+
+Recovery:
+1. Verify account/service principal has required role on target provider resource.
+2. For Vertex AI, confirm ADC is set up and principal has model invoke permissions.
+3. Retry with `agentheim ping-models` after role fix.
+4. If tool operation requested approval, grant from CLI prompt or lower-risk path.
+
+### Provider endpoint/model mismatch
+
+Typical symptoms:
+- `Model not found`
+- `deployment not found`
+- `unsupported model`
+- `bad request`
+
+Recovery:
+1. Run `agentheim provider list` and confirm provider id, endpoint, and model/deployment name.
+2. For Azure Foundry, confirm the endpoint resolves to your resource and deployment name matches the configured model field.
+3. For OpenAI-compatible local servers, verify the model is actually loaded by the server.
+4. Retry with `agentheim provider test --role planner`.
+
+### Google ADC / project / location failure
+
+Typical symptoms:
+- `ADC not found`
+- `requires ADC project`
+- `permission denied` on Vertex AI
+
+Recovery:
+1. Run `gcloud auth application-default login`.
+2. Ensure the provider metadata includes `project_id` and `location`.
+3. Confirm the ADC principal can invoke Vertex AI models in that project and region.
+4. Retry with `agentheim provider test --profile <profile> --role planner`.
+
+### Local provider not running
+
+Typical symptoms:
+- `connection refused`
+- `Network unreachable`
+- localhost endpoint warnings in `agentheim doctor`
+
+Recovery:
+1. Start the local server first, for example Ollama, LM Studio, vLLM, TGI, llama.cpp, or the `.localtest/mock-ai-server/` shim.
+2. Re-run `agentheim doctor --skip-connectivity` and confirm `Local endpoint reachability` passes or skips as expected.
+3. Retry with `agentheim provider test --role planner`.
+
+### Provider rate limit or temporary outage
+
+Typical symptoms:
+- `Rate limit exceeded`
+- `quota exceeded`
+- `service unavailable`
+- `timed out`
+
+Recovery:
+1. Retry after short wait.
+2. Reduce concurrency or switch to fallback model/provider.
+3. Increase provider timeout if model is slow.
+4. Re-run `agentheim ping-models` before full workflow.
+
 ### Multiple providers not loading
 
 Run `agentheim provider list`. If a provider is missing, add it again with `agentheim provider add` or migrate once with `agentheim provider import-env`.
@@ -144,6 +225,14 @@ agentheim report --repo . --run-id <id>
 agentheim resume --repo . --run-id <id>
 ```
 
+Use error category from run report/ledger summary as triage hint:
+- `transient` → retry after backoff or switch provider
+- `recoverable` → adjust input/prompt, rerun step
+- `verification` → inspect verifier output, fix, rerun bounded loop
+- `configuration` → fix local/provider config first
+- `permission` → grant approval or fix IAM/credentials
+- `fatal` → inspect diagnostics before rerun
+
 ### Tool call blocked
 
 If a tool is blocked by the policy engine, try:
@@ -151,6 +240,69 @@ If a tool is blocked by the policy engine, try:
 1. Adjust the approval level: use `--mode auto` for fewer prompts
 2. Check privacy mode or policy config: `local_only` blocks network tools
 3. For API calls, use LOW or MEDIUM risk tools only; HIGH and CRITICAL tools are rejected by the API route
+
+### Approval required
+
+Typical symptoms:
+- `approval_required`
+- CLI prompt asking whether to grant a copy/write action
+
+Recovery:
+1. Review the requested action and target path carefully.
+2. Grant from the CLI prompt when the action is expected.
+3. In API/Web flows, retry the same action through CLI if the route only returns the approval request payload.
+
+### Privacy restriction
+
+Typical symptoms:
+- network tools blocked while repo is configured for local-only work
+
+Recovery:
+1. Confirm whether the current task should stay local-first.
+2. Use local tools only, or re-run with a policy/profile that allows the specific networked action.
+3. Retry after confirming privacy mode and provider/network policy settings.
+
+### Path confinement
+
+Typical symptoms:
+- writes or copies rejected outside allowed workspace paths
+
+Recovery:
+1. Check the requested source and destination paths are under the intended repo root.
+2. Re-run with paths relative to the target workspace.
+3. If the path is intentionally outside the repo, do not bypass confinement silently; use a controlled manual path instead.
+
+### Budget exceeded
+
+Typical symptoms:
+- run stops with budget or max-step guard errors
+
+Recovery:
+1. Reduce task scope.
+2. Lower diff size or split the task into smaller batches.
+3. Retry with a narrower prompt or smaller workflow slice.
+
+### Malformed model output
+
+Typical symptoms:
+- structured agent returned invalid JSON
+- verifier/coder/parser output failed schema parsing
+
+Recovery:
+1. Retry once in case it was transient.
+2. Switch to a stronger model for the affected role.
+3. Reduce prompt ambiguity and prefer a provider/model with proven JSON support.
+
+### Stale context
+
+Typical symptoms:
+- context verification says stale
+- generated context no longer matches repository state
+
+Recovery:
+1. Run `agentheim ctx status`.
+2. If stale, run `agentheim ctx run --scope changed` or `agentheim ctx verify --strict`.
+3. Re-run the workflow only after the context path is fresh again.
 
 ---
 
@@ -195,6 +347,11 @@ agentheim resume --repo . --run-id <id>
 ```
 
 This replays the event log and resumes from the last checkpoint. Works for most failure modes including network errors, provider timeouts, and approval timeouts.
+
+If resume/report says ledger metadata is missing or incompatible:
+1. Inspect `.ai-team/runs/<run-id>/run.json` and `ledger.jsonl`
+2. Re-run `agentheim report --repo . --run-id <id>` to confirm whether fallback metadata loads
+3. If ledger is from older format, preserve artifacts and rerun workflow from clean state
 
 ---
 

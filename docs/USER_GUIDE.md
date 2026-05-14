@@ -88,6 +88,77 @@ agentheim provider add openai --template openai_v1 --model gpt-4o-mini --role pl
 agentheim provider list
 ```
 
+`agentheim doctor` also checks provider profile presence, planner/executor/verifier role coverage, first-class lane readiness, localhost endpoint reachability when local providers are configured, and ContextOps availability.
+
+#### Google AI Services Setup
+
+Gemini API and Vertex AI are supported as native Google lanes.
+
+**Gemini API key path**
+
+```bash
+agentheim provider add gemini --template gemini --model gemini-2.5-flash --role planner
+agentheim provider assign executor --provider gemini --model gemini-2.5-flash
+agentheim provider assign verifier --provider gemini --model gemini-2.5-flash
+agentheim ping-models
+```
+
+**Vertex AI ADC path**
+
+1. Authenticate ADC:
+
+```bash
+gcloud auth application-default login
+```
+
+2. Add the provider with explicit project and location metadata:
+
+```bash
+agentheim provider add vertex --template vertex_ai --model gemini-2.5-pro --role planner
+agentheim provider assign executor --provider vertex --model gemini-2.5-pro
+agentheim provider assign verifier --provider vertex --model gemini-2.5-pro
+```
+
+3. Edit the provider profile if needed so the provider metadata includes:
+
+- `project_id`: your Google Cloud project id
+- `location`: the Vertex region, for example `us-central1`
+
+4. Re-run diagnostics:
+
+```bash
+agentheim doctor --skip-connectivity
+agentheim ping-models
+```
+
+If Vertex fails with permission errors, verify the ADC principal can invoke models in the configured project and location.
+
+#### Self-Hosted OpenAI-Compatible Setup
+
+Agentheim treats localhost and VM-hosted OpenAI-compatible endpoints as the main self-hosted lane.
+
+Common templates:
+- `ollama` → `http://localhost:11434/v1`
+- `lm_studio` → `http://localhost:1234/v1`
+- `vllm` → `http://localhost:8000/v1`
+- `tgi` → `http://localhost:8080/v1`
+- `llama_cpp` → `http://localhost:8080/v1`
+
+Typical local setup flow:
+
+```bash
+agentheim provider add local --template ollama --model llama3.1 --role planner
+agentheim provider assign executor --provider local --model llama3.1
+agentheim provider assign verifier --provider local --model llama3.1
+agentheim doctor --skip-connectivity
+agentheim provider test --role planner
+```
+
+Quality guidance:
+- smaller OSS models may pass `command-assistant` but still fail coding or verifier-heavy flows
+- use stronger instruction-following models for `codebase-assistant`
+- vision claims only matter when the local server and chosen model both support vision inputs
+
 #### Supported Provider Types
 
 | Type | Description | Example Endpoint |
@@ -191,7 +262,7 @@ agentheim presets             # List available presets
 | `agentheim plan <task> --repo <path>` | Plan a task without executing |
 | `agentheim run <task> --repo <path>` | Execute a task with mode selection |
 | `agentheim list-runs --repo <path>` | List all runs in a repository |
-| `agentheim report --repo <path> --run-id <id>` | Show full report for a run |
+| `agentheim report --repo <path> --run-id <id>` | Emit the canonical run summary JSON for a run |
 | `agentheim resume --repo <path> --run-id <id>` | Resume a blocked or incomplete run |
 | `agentheim presets` | List all available presets |
 | `agentheim memory get --key <key>` | Read a value from global memory |
@@ -324,6 +395,7 @@ Every run produces artifacts under `.ai-team/runs/<run-id>/` inside the target r
 | `patch.diff` | File changes (if applicable) |
 | `verification.json` | Verification results |
 | `final_report.md` | Human-readable final report |
+| `final_report.json` | Workflow-specific structured final report |
 
 ---
 

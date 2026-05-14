@@ -71,9 +71,10 @@ class TestHealthReporter:
     def test_providers(self, tmp_path: Path) -> None:
         h = HealthReporter(repo_root=tmp_path)
         statuses = h.check_providers()
-        assert len(statuses) == 4
+        assert len(statuses) >= 4
         provider_ids = {s.component for s in statuses}
         assert "provider:openai_v1" in provider_ids
+        assert "provider:gemini" in provider_ids
 
     def test_full_report(self, tmp_path: Path) -> None:
         h = HealthReporter(repo_root=tmp_path)

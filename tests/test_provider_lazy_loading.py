@@ -19,7 +19,18 @@ class TestProviderLazyLoading:
         new_modules = after - before
         provider_modules = {m for m in new_modules if m.startswith("providers.") and m != "providers"}
         assert not provider_modules, f"Provider modules loaded: {provider_modules}"
-        assert ids == ["openai_v1", "aws_bedrock", "azure_foundry", "oci_genai"]
+        assert ids == [
+            "openai_v1",
+            "aws_bedrock",
+            "azure_foundry",
+            "oci_genai",
+            "anthropic",
+            "cohere",
+            "gemini",
+            "vertex_ai",
+            "perplexity",
+            "ollama_cloud",
+        ]
 
     def test_get_provider_metadata_does_not_load(self) -> None:
         before = set(sys.modules.keys())

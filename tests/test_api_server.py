@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from core.events import EventType
+from core.ledger import RunLedger
 from interfaces.api_server import create_api_app
 from interfaces.api_server.auth import _API_KEYS, _initialized
 
@@ -121,7 +124,58 @@ class TestTools:
         assert data["success"] is False
         assert data["requires_approval"] is True
         assert data["policy"]["decision"] == "ask"
+        assert data["approval_request"]["request_id"]
         assert not (tmp_path / "created.txt").exists()
+
+    def test_grant_filesystem_write_executes_and_records_ledger(self, tmp_path: Path, client: TestClient) -> None:
+        response = client.post(
+            "/api/tools/filesystem/invoke",
+            json={"params": {"operation": "write", "path": "created.txt", "content": "new"}},
+            headers={"X-API-Key": "test-key"},
+        )
+        request_id = response.json()["approval_request"]["request_id"]
+
+        grant = client.post(
+            f"/api/tools/approvals/{request_id}/grant",
+            headers={"X-API-Key": "test-key"},
+        )
+        assert grant.status_code == 200
+        data = grant.json()
+        assert data["status"] == "granted"
+        assert data["success"] is True
+        assert (tmp_path / "created.txt").read_text(encoding="utf-8") == "new"
+
+        run_dirs = sorted((tmp_path / ".ai-team" / "runs").iterdir())
+        ledger = RunLedger(repo_root=tmp_path, run_dir=run_dirs[-1])
+        event_types = [event.event_type for event in ledger.read_ledger()]
+        assert EventType.POLICY_EVALUATED in event_types
+        assert EventType.APPROVAL_REQUESTED in event_types
+        assert EventType.APPROVAL_GRANTED in event_types
+        assert EventType.TOOL_RESULT_RECEIVED in event_types
+
+    def test_deny_filesystem_write_records_denial(self, tmp_path: Path, client: TestClient) -> None:
+        response = client.post(
+            "/api/tools/filesystem/invoke",
+            json={"params": {"operation": "write", "path": "created.txt", "content": "new"}},
+            headers={"X-API-Key": "test-key"},
+        )
+        request_id = response.json()["approval_request"]["request_id"]
+
+        deny = client.post(
+            f"/api/tools/approvals/{request_id}/deny",
+            headers={"X-API-Key": "test-key"},
+        )
+        assert deny.status_code == 200
+        data = deny.json()
+        assert data["status"] == "denied"
+        assert data["error"] == "approval_denied"
+        assert not (tmp_path / "created.txt").exists()
+
+        run_dirs = sorted((tmp_path / ".ai-team" / "runs").iterdir())
+        ledger = RunLedger(repo_root=tmp_path, run_dir=run_dirs[-1])
+        event_types = [event.event_type for event in ledger.read_ledger()]
+        assert EventType.APPROVAL_REQUESTED in event_types
+        assert EventType.APPROVAL_DENIED in event_types
 
 
 class TestWorkflows:
@@ -207,12 +261,23 @@ class TestRuns:
         run_dir = tmp_path / ".ai-team" / "runs" / "test-run-1"
         run_dir.mkdir(parents=True)
         (run_dir / "final_report.md").write_text("# Report", encoding="utf-8")
+        (run_dir / "run.json").write_text(
+            json.dumps({"run_id": "test-run-1", "workflow_id": "coding", "preset_id": "codebase-assistant"}),
+            encoding="utf-8",
+        )
+        (run_dir / "final_report.json").write_text(
+            json.dumps({"run_id": "test-run-1", "task_summary": "Ship fix", "status": "done"}),
+            encoding="utf-8",
+        )
         response = client.get("/api/runs/test-run-1")
         assert response.status_code == 200
         data = response.json()
         assert data["run_id"] == "test-run-1"
         assert data["status"] == "completed"
         assert "final_report.md" in data["artifacts"]
+        assert data["workflow_id"] == "coding"
+        assert data["preset_id"] == "codebase-assistant"
+        assert data["summary"] == "Ship fix"
 
 
 class TestWorkflowExecution:
@@ -308,6 +373,44 @@ class TestRunWebSocket:
             assert msg2["run_id"] == run_id
             assert msg2["status"] == "completed"
             assert msg2["artifacts"] == []
+
+    def test_websocket_final_message_uses_canonical_run_summary(self, tmp_path: Path, client: TestClient) -> None:
+        import threading
+        import time
+        from core.run_executor import RunExecutor
+
+        executor = RunExecutor()
+        started = threading.Event()
+
+        class _Result:
+            run_id = "persisted-run"
+
+        def _task():
+            started.set()
+            run_dir = tmp_path / ".ai-team" / "runs" / "persisted-run"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "run.json").write_text(
+                json.dumps({"run_id": "persisted-run", "workflow_id": "coding"}),
+                encoding="utf-8",
+            )
+            (run_dir / "final_report.json").write_text(
+                json.dumps({"run_id": "persisted-run", "task_summary": "Canonical final payload", "status": "done"}),
+                encoding="utf-8",
+            )
+            (run_dir / "final_report.md").write_text("# Report", encoding="utf-8")
+            time.sleep(0.2)
+            return _Result()
+
+        run_id = executor.submit(_task)
+        started.wait(timeout=2.0)
+
+        with client.websocket_connect(f"/api/runs/{run_id}/ws") as ws:
+            _ = ws.receive_json()
+            final = ws.receive_json()
+            assert final["run_id"] == "persisted-run"
+            assert final["tracking_run_id"] == run_id
+            assert final["status"] == "completed"
+            assert final["summary"] == "Canonical final payload"
 
 
 class TestMetrics:

@@ -83,7 +83,7 @@ When a tool invocation requires approval:
 #### Interface Behavior
 
 - **CLI**: Medium-risk operations prompt interactively (`Grant approval? [y/N]`). If granted, the request is re-invoked with the approved decision.
-- **API / Web UI**: Medium-risk operations return an approval-required payload (HTTP 409) without executing. The caller must explicitly grant approval before the tool runs.
+- **API / Web UI**: Medium-risk operations return an approval-required payload (HTTP 409) without executing. The caller must explicitly grant or deny the request through the approval continuation routes before the tool runs or is cancelled.
 - **Workflow internal**: Coding and other workflows evaluate policy through their own agent adapters, which remain autonomous but must respect the same `PolicyEngine` rules.
 
 ---

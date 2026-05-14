@@ -18,6 +18,12 @@ _PROVIDER_METADATA: dict[str, dict[str, str]] = {
     "aws_bedrock": {"module": "providers.aws_bedrock", "class": "AWSBedrockProvider"},
     "azure_foundry": {"module": "providers.azure_foundry", "class": "AzureFoundryProvider"},
     "oci_genai": {"module": "providers.oci_genai", "class": "OCIGenAIProvider"},
+    "anthropic": {"module": "providers.anthropic", "class": "AnthropicProvider"},
+    "cohere": {"module": "providers.cohere", "class": "CohereProvider"},
+    "gemini": {"module": "providers.gemini", "class": "GeminiProvider"},
+    "vertex_ai": {"module": "providers.gemini", "class": "VertexAIProvider"},
+    "perplexity": {"module": "providers.perplexity", "class": "PerplexityProvider"},
+    "ollama_cloud": {"module": "providers.ollama_cloud", "class": "OllamaCloudProvider"},
 }
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -117,3 +118,23 @@ class TestCliCommands:
         result = runner.invoke(app, ["doctor", "--skip-connectivity"])
         # Should complete even without full config; at least shows the table
         assert "System Diagnostics" in result.output or result.exit_code in (0, 1)
+
+    def test_report_emits_canonical_run_summary_json(self, tmp_path: Path) -> None:
+        run_dir = tmp_path / ".ai-team" / "runs" / "test-run-1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "run.json").write_text(
+            json.dumps({"run_id": "test-run-1", "workflow_id": "coding", "preset_id": "codebase-assistant"}),
+            encoding="utf-8",
+        )
+        (run_dir / "final_report.json").write_text(
+            json.dumps({"run_id": "test-run-1", "task_summary": "Fix bug", "status": "done"}),
+            encoding="utf-8",
+        )
+        (run_dir / "final_report.md").write_text("# Report", encoding="utf-8")
+
+        result = runner.invoke(app, ["report", "--repo", str(tmp_path), "--run-id", "test-run-1"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        assert payload["run_id"] == "test-run-1"
+        assert payload["status"] == "completed"
+        assert payload["summary"] == "Fix bug"

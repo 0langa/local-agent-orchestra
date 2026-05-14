@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from providers import list_providers
+
 
 @dataclass
 class HealthStatus:
@@ -48,7 +50,7 @@ class HealthReporter:
     def check_providers(self) -> list[HealthStatus]:
         """Basic provider health (imports successfully)."""
         statuses = []
-        for name in ["openai_v1", "aws_bedrock", "azure_foundry", "oci_genai"]:
+        for name in list_providers():
             try:
                 module_name = f"providers.{name}"
                 __import__(module_name)

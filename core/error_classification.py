@@ -11,6 +11,19 @@ import socket
 import ssl
 from typing import Any
 
+from core.errors import (
+    ConfigError,
+    ExecutionError,
+    IntegrationError,
+    PatchApplicationError,
+    PlanningError,
+    ProviderError,
+    RepoInspectionError,
+    ResumeError,
+    ToolSafetyError,
+    VerificationError,
+)
+
 
 class ErrorCategory(Enum):
     """Canonical error categories.
@@ -60,7 +73,114 @@ _CATEGORY_MAP: dict[type[BaseException], ErrorCategory] = {
     RecursionError: ErrorCategory.FATAL,
     NotImplementedError: ErrorCategory.FATAL,
     RuntimeError: ErrorCategory.FATAL,
+
+    # Agentheim-specific
+    ConfigError: ErrorCategory.CONFIGURATION,
+    ToolSafetyError: ErrorCategory.PERMISSION,
+    PlanningError: ErrorCategory.RECOVERABLE,
+    ExecutionError: ErrorCategory.FATAL,
+    PatchApplicationError: ErrorCategory.VERIFICATION,
+    VerificationError: ErrorCategory.VERIFICATION,
+    ResumeError: ErrorCategory.CONFIGURATION,
+    IntegrationError: ErrorCategory.CONFIGURATION,
+    RepoInspectionError: ErrorCategory.CONFIGURATION,
 }
+
+
+def _classify_provider_error(exc: ProviderError) -> ErrorCategory:
+    """Sub-classify a ProviderError based on message content."""
+    msg = str(exc).lower()
+    if any(k in msg for k in ("rate limit", "quota", "too many", "temporarily unavailable", "server overloaded")):
+        return ErrorCategory.TRANSIENT
+    if any(k in msg for k in ("timeout", "timed out", "deadline exceeded")):
+        return ErrorCategory.TRANSIENT
+    if any(k in msg for k in ("connection", "network", "unreachable", "connection reset", "service unavailable")):
+        return ErrorCategory.TRANSIENT
+    if any(k in msg for k in ("permission denied", "forbidden", "access denied")):
+        return ErrorCategory.PERMISSION
+    if any(k in msg for k in ("authentication", "auth", "api_key", "credentials", "invalid api key", "unauthorized")):
+        return ErrorCategory.CONFIGURATION
+    if any(k in msg for k in ("model", "deployment", "not found", "unsupported", "invalid request", "bad request")):
+        return ErrorCategory.CONFIGURATION
+    return ErrorCategory.FATAL
+
+
+def _troubleshooting_section(exc: BaseException, category: ErrorCategory) -> str:
+    """Return the best matching troubleshooting section label."""
+    if isinstance(exc, ProviderError):
+        msg = str(exc).lower()
+        if any(k in msg for k in ("permission denied", "forbidden", "access denied")):
+            return "Provider permission denied / forbidden"
+        if any(k in msg for k in ("authentication", "auth", "api_key", "credentials", "invalid api key", "unauthorized")):
+            return "Provider authentication failed"
+        if any(k in msg for k in ("rate limit", "quota", "too many", "temporarily unavailable", "service unavailable", "timeout", "timed out")):
+            return "Provider rate limit or temporary outage"
+        if any(k in msg for k in ("model", "deployment", "not found", "unsupported", "invalid request", "bad request")):
+            return "Provider endpoint/model mismatch"
+    if isinstance(exc, ToolSafetyError) or category == ErrorCategory.PERMISSION:
+        return "Tool call blocked"
+    if isinstance(exc, ResumeError):
+        return "Recovering from a failed run"
+    if isinstance(exc, PatchApplicationError) or isinstance(exc, VerificationError):
+        return "Run fails mid-execution"
+    if category == ErrorCategory.CONFIGURATION:
+        return "Configuration Issues"
+    if category == ErrorCategory.TRANSIENT:
+        return "Provider rate limit or temporary outage"
+    return "Run fails mid-execution"
+
+
+def _next_action_for(category: ErrorCategory) -> str:
+    return {
+        ErrorCategory.TRANSIENT: "Retry operation after backoff or switch provider if issue persists.",
+        ErrorCategory.RECOVERABLE: "Retry step with adjusted input or prompt.",
+        ErrorCategory.VERIFICATION: "Inspect verification output, fix issue, rerun bounded fix loop.",
+        ErrorCategory.CONFIGURATION: "Fix local/provider configuration before retrying.",
+        ErrorCategory.PERMISSION: "Grant approval or update credentials/permissions before retrying.",
+        ErrorCategory.FATAL: "Inspect run diagnostics and error context before rerunning.",
+    }[category]
+
+
+def error_summary_from_text(message: str, error_type: str | None = None) -> dict[str, Any]:
+    """Best-effort error summary when only serialized error text is available."""
+    error_map: dict[str, type[BaseException]] = {
+        "AssertionError": AssertionError,
+        "ConfigError": ConfigError,
+        "ExecutionError": ExecutionError,
+        "FileNotFoundError": FileNotFoundError,
+        "ImportError": ImportError,
+        "IntegrationError": IntegrationError,
+        "KeyError": KeyError,
+        "MemoryError": MemoryError,
+        "ModuleNotFoundError": ModuleNotFoundError,
+        "NotImplementedError": NotImplementedError,
+        "PatchApplicationError": PatchApplicationError,
+        "PermissionError": PermissionError,
+        "PlanningError": PlanningError,
+        "ProviderError": ProviderError,
+        "RecursionError": RecursionError,
+        "RepoInspectionError": RepoInspectionError,
+        "ResumeError": ResumeError,
+        "RuntimeError": RuntimeError,
+        "TimeoutError": TimeoutError,
+        "ToolSafetyError": ToolSafetyError,
+        "ValueError": ValueError,
+        "VerificationError": VerificationError,
+    }
+    exc_cls = error_map.get(error_type or "")
+    if exc_cls is None:
+        lowered = message.lower()
+        if any(token in lowered for token in ("auth", "api key", "credential", "forbidden", "rate limit", "quota", "model", "deployment", "timeout", "network")):
+            exc: BaseException = ProviderError(message)
+        elif "permission" in lowered or "approval denied" in lowered:
+            exc = PermissionError(message)
+        elif "verify" in lowered or "patch" in lowered:
+            exc = VerificationError(message)
+        else:
+            exc = RuntimeError(message)
+    else:
+        exc = exc_cls(message)
+    return error_summary(exc)
 
 
 def classify_error(exc: BaseException) -> ErrorCategory:
@@ -69,6 +189,8 @@ def classify_error(exc: BaseException) -> ErrorCategory:
     Walks the exception's MRO and returns the first matching category.
     Falls back to FATAL for unmapped exceptions.
     """
+    if isinstance(exc, ProviderError):
+        return _classify_provider_error(exc)
     for cls in type(exc).__mro__:
         if cls in _CATEGORY_MAP:
             return _CATEGORY_MAP[cls]
@@ -117,8 +239,15 @@ def should_halt(category: ErrorCategory) -> bool:
 
 def error_summary(exc: BaseException) -> dict[str, Any]:
     """Produce a JSON-safe summary of an exception for ledger payloads."""
+    category = classify_error(exc)
+    troubleshooting_section = _troubleshooting_section(exc, category)
     return {
         "type": type(exc).__name__,
         "message": str(exc),
-        "category": classify_error(exc).value,
+        "category": category.value,
+        "retryable": should_retry(category),
+        "halt": should_halt(category),
+        "next_action": _next_action_for(category),
+        "troubleshooting_doc": "docs/TROUBLESHOOTING.md",
+        "troubleshooting_section": troubleshooting_section,
     }

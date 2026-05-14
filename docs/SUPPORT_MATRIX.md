@@ -16,8 +16,8 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | Lane | State | Owner | Entry Points | Evidence | Known Limits |
 | --- | --- | --- | --- | --- | --- |
 | OpenAI-compatible, including Azure OpenAI/Foundry-compatible endpoints | Beta | Providers | CLI provider commands, API provider routes | Provider templates load; Azure `azure-real` historical live evidence; provider tests exist | Needs fresh OpenAI-compatible live lane gate before stable |
-| Google AI services: Gemini API and Vertex AI | Beta | Providers | CLI provider commands, API provider routes | Templates and adapters load; provider unit coverage exists | Needs fresh Gemini API and Vertex ADC live evidence |
-| Self-hosted OSS through OpenAI-compatible endpoints | Beta | Providers | CLI provider commands | Ollama, LM Studio, vLLM, TGI, llama.cpp server, and generic compatible templates exist | Needs fresh local endpoint smoke and model-quality guidance validation |
+| Google AI services: Gemini API and Vertex AI | Beta | Providers | CLI provider commands, API provider routes | Templates and adapters load; provider unit coverage exists; Gemini provider smoke is freshly re-verified on 2026-05-14 | Still needs Vertex ADC, stable-preset, and vision live evidence |
+| Self-hosted OSS through OpenAI-compatible endpoints | Beta | Providers | CLI provider commands | Ollama, LM Studio, vLLM, TGI, llama.cpp server, and generic compatible templates exist; localhost compatibility shim smoke passed on 2026-05-14 via `.localtest/mock-ai-server/` | Still needs fresh real local endpoint smoke and model-quality guidance validation |
 | Other integrated providers | Experimental | Providers | CLI provider commands | Templates/adapters exist for current registry | Functional in theory; not polished/proven like top 3 lanes |
 
 ## Provider Adapters
@@ -27,7 +27,7 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | `openai_v1` | Beta | Template, adapter, provider tests | Promote with fresh OpenAI live smoke |
 | `openai_compatible` | Beta | Template and shared compatible path | Includes many hosted/local gateways |
 | `azure_foundry` | Beta | Template, adapter, historical live evidence | Main dev lane; needs current baseline live rerun |
-| `gemini` | Beta | Template, adapter, provider tests | Needs current Gemini API live rerun |
+| `gemini` | Beta | Template, adapter, provider tests, fresh planner smoke on 2026-05-14 | Still needs stable-preset and vision live evidence |
 | `vertex_ai` | Beta | Template, adapter, provider tests | Needs ADC/project/location live rerun |
 | `ollama`, `lm_studio`, `vllm`, `tgi`, `llama_cpp` | Beta | Templates via compatible path | Needs local live endpoint evidence |
 | `anthropic`, `aws_bedrock`, `oci_genai`, `cohere`, `perplexity`, `ollama_cloud` | Experimental | Templates/adapters/tests vary by provider | Keep available; do not present as first-run path |
@@ -60,7 +60,7 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 
 | Tool | State | Risk | Evidence | Notes |
 | --- | --- | --- | --- | --- |
-| `filesystem` | Beta | Operation-level: read/list/stat none, write/copy medium | Tool tests, API/Web tests, centralized invoker tests | Medium operations now return approval-required in API/Web |
+| `filesystem` | Beta | Operation-level: read/list/stat none, write/copy medium | Tool tests, API/Web approval-flow tests, centralized invoker tests | Medium operations now return approval-required in API/Web and can be granted/denied explicitly |
 | `git` | Beta | none currently declared | Tool tests | Mutating git operations need operation-level risk follow-up |
 | `shell.execute` | Beta | high | Tool tests, policy tests | API/Web deny high-risk path |
 | `browser` | Experimental | high | Unit tests | Live browser evidence incomplete |

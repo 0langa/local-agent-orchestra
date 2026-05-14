@@ -86,7 +86,7 @@ POST /api/tools/{tool_id}/invoke
 
 Body: tool parameters as JSON.
 
-**Safety:** API tool calls route through the centralized tool invocation service. LOW/NONE operations may execute. MEDIUM operations return `409` with an approval-required payload and are not executed. HIGH and CRITICAL operations return `403`.
+**Safety:** API tool calls route through the centralized tool invocation service. LOW/NONE operations may execute. MEDIUM operations return `409` with an approval-required payload until you explicitly grant or deny the request. HIGH and CRITICAL operations return `403`.
 
 Tool invocation responses include:
 
@@ -98,6 +98,21 @@ Tool invocation responses include:
 | `metadata` | Tool or approval metadata |
 | `requires_approval` | `true` when policy returned `ask` |
 | `policy` | Redacted policy decision metadata |
+| `approval_request` | Pending approval object including `request_id` for continuation routes |
+
+#### Grant Tool Approval
+```
+POST /api/tools/approvals/{request_id}/grant
+```
+
+Requires `X-API-Key`. Approves the pending request, executes the tool, and returns the final tool result.
+
+#### Deny Tool Approval
+```
+POST /api/tools/approvals/{request_id}/deny
+```
+
+Requires `X-API-Key`. Denies the pending request, records the denial in the ledger, and returns a denial payload.
 
 ### Workflows
 
@@ -211,21 +226,39 @@ Returns provider health entries for the built-in provider adapters.
 GET /api/runs/{run_id}
 ```
 
-Returns run metadata from ledger if found.
+Returns the canonical run summary assembled from persisted run artifacts and ledger events when available. The response includes:
+
+- `run_id`
+- `tracking_run_id` when the request came through an async executor id that resolved to a persisted run id
+- `workflow_id` / `preset_id`
+- `status`
+- `summary`
+- `started_at`, `finished_at`, `duration_seconds`
+- `repo_root` (redacted when the stored artifact was redacted)
+- `provider_models_by_role`
+- `state_transitions`
+- `tool_counts`
+- `policy_decisions`
+- `approvals`
+- `verification`
+- `artifacts`
+- `error`
+- `next_recommended_action`
+- `final_report`
 
 #### Stream Run Events (SSE)
 ```
 GET /api/runs/{run_id}/stream
 ```
 
-Server-Sent Events stream of run progress.
+Server-Sent Events stream of run progress. Initial payload and final payload use the same canonical run summary shape as `GET /api/runs/{run_id}`.
 
 #### WebSocket Run Events
 ```
 WS /api/runs/{run_id}/ws
 ```
 
-Bidirectional WebSocket for real-time run events.
+WebSocket stream for real-time run events. Initial payload and final payload use the same canonical run summary shape as `GET /api/runs/{run_id}`.
 
 ### Context (AICtx)
 
