@@ -2,6 +2,12 @@
 
 ## 2026-05-14
 
+### Phase 2 Start — OpenAIV1Provider Hardening (Lane 1)
+- `OpenAIV1Provider` now supports `auth_mode="none"` by substituting `"no-key-required"` for the OpenAI client key (`providers/openai_v1.py`).
+- Added structured error classification: `_NON_RETRYABLE` (`AuthenticationError`, `PermissionDeniedError`, `BadRequestError`, `NotFoundError`, `UnprocessableEntityError`, `ConflictError`) raises `ProviderError` immediately; `_RETRYABLE` (`RateLimitError`, `APITimeoutError`, `APIConnectionError`, `InternalServerError`) follows existing retry/backoff logic (`providers/openai_v1.py`).
+- Added provider unit tests: `test_auth_mode_none_uses_dummy_key`, `test_auth_error_raises_immediately`, `test_rate_limit_is_retried` (`tests/test_providers_individual.py`).
+- All 38 provider tests pass; baseline gate passes.
+
 ### Phase 1 Complete — Safety And Runtime Spine
 - Unified tool invocation path across API, Web UI, and CLI (`core/tool_invocation.py`, `interfaces/api_server/app.py`, `interfaces/web_ui/app.py`, `interfaces/cli/cli.py`).
 - Operation-level filesystem risk: read/list/stat → none, write/copy → medium.

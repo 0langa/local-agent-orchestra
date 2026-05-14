@@ -137,6 +137,57 @@ class TestOpenAIV1Provider:
         assert mock_client.chat.completions.create.call_count == 3
         assert mock_sleep.call_count == 2
 
+    def test_auth_mode_none_uses_dummy_key(self) -> None:
+        config = make_config(auth_mode="none", api_key="dummy")
+        with patch("providers.openai_v1.OpenAI") as mock_openai:
+            provider = OpenAIV1Provider(config)
+
+        mock_openai.assert_called_once_with(
+            api_key="no-key-required",
+            base_url="https://api.test.com",
+            timeout=30.0,
+            default_headers=None,
+        )
+        assert provider.config is config
+
+    def test_auth_error_raises_immediately(self) -> None:
+        from openai import AuthenticationError
+
+        config = make_config()
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = AuthenticationError(
+            "invalid key", response=MagicMock(), body=None
+        )
+
+        with patch("providers.openai_v1.OpenAI", return_value=mock_client):
+            provider = OpenAIV1Provider(config)
+            request = make_request()
+            with pytest.raises(ProviderError, match="OpenAI request failed"):
+                provider.invoke(request)
+
+        assert mock_client.chat.completions.create.call_count == 1
+
+    def test_rate_limit_is_retried(self) -> None:
+        from openai import RateLimitError
+
+        config = make_config()
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = RateLimitError(
+            "too many requests", response=MagicMock(), body=None
+        )
+
+        with (
+            patch("providers.openai_v1.OpenAI", return_value=mock_client),
+            patch("providers.openai_v1.time.sleep") as mock_sleep,
+        ):
+            provider = OpenAIV1Provider(config)
+            request = make_request()
+            with pytest.raises(ProviderError, match="Model invocation failed after retries"):
+                provider.invoke(request)
+
+        assert mock_client.chat.completions.create.call_count == 3
+        assert mock_sleep.call_count == 2
+
 
 # ---------------------------------------------------------------------------
 # AnthropicProvider

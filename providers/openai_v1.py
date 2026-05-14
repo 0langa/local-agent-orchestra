@@ -3,16 +3,48 @@ from __future__ import annotations
 import time
 
 from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    InternalServerError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+    UnprocessableEntityError,
+)
 
 from core.errors import ProviderError
 from providers.base import ModelProvider, ModelRequest, ModelResponse
 
 
+_NON_RETRYABLE = (
+    AuthenticationError,
+    PermissionDeniedError,
+    BadRequestError,
+    NotFoundError,
+    UnprocessableEntityError,
+    ConflictError,
+)
+
+_RETRYABLE = (
+    RateLimitError,
+    APITimeoutError,
+    APIConnectionError,
+    InternalServerError,
+)
+
+
 class OpenAIV1Provider(ModelProvider):
     def __init__(self, config):
         super().__init__(config)
+        api_key = config.api_key
+        if getattr(config, "auth_mode", None) == "none":
+            api_key = "no-key-required"
         self._client = OpenAI(
-            api_key=config.api_key,
+            api_key=api_key,
             base_url=config.endpoint,
             timeout=float(config.timeout_seconds),
             default_headers=config.headers or None,
@@ -40,9 +72,13 @@ class OpenAIV1Provider(ModelProvider):
             try:
                 response = self._client.chat.completions.create(**create_kwargs)
                 break
-            except Exception as exc:  # pragma: no cover - network/provider dependent
+            except _NON_RETRYABLE as exc:
+                raise ProviderError(f"OpenAI request failed: {exc}") from exc
+            except _RETRYABLE as exc:
                 last_error = exc
-        else:  # pragma: no cover - network/provider dependent
+            except Exception as exc:  # pragma: no cover - unexpected provider errors
+                last_error = exc
+        else:
             raise ProviderError(f"Model invocation failed after retries: {last_error}") from last_error
         content = response.choices[0].message.content or ""
         usage = response.usage
