@@ -2,6 +2,13 @@
 
 ## 2026-05-15
 
+### Phase 4 Slice — Research Workflow Negative-Path Coverage
+- Added `TestResearchWorkflowNegativePaths` with 2 tests:
+  1. `test_research_workflow_gather_failure_halts` — invalid gather output halts DAG before summarize/report; runner returns single failed step.
+  2. `test_research_workflow_empty_sources_graceful` — empty sources list propagates through summarize → report without crashing; all 3 steps succeed.
+- Updated `docs/SUPPORT_MATRIX.md` `research-report` known limits to reflect stronger coverage.
+- Validation: `tests/smoke/test_workflow_execution.py` 15 passed.
+
 ### Phase 4 Slice — File Organization Negative-Path Coverage
 - Added explicit overwrite guard in `workflows/file_organization/workflows/file_organization.py` `_execute_apply`: destination existence checked before `src.rename(dst)` with clear error `"Destination already exists"`.
 - Added `TestFileOrganizationNegativePaths` with 3 tests:

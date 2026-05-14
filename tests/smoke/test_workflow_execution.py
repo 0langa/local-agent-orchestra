@@ -301,3 +301,44 @@ class TestFileOrganizationNegativePaths:
         assert any(m.get("source") == "old.txt" for m in moves)
         # File should remain untouched
         assert (tmp_path / "old.txt").exists()
+
+
+class TestResearchWorkflowNegativePaths:
+    def test_research_workflow_gather_failure_halts(self, mock_deps, tmp_path: Path) -> None:
+        from workflows.research import ResearchWorkflow
+        from workflows.research.agents.base import BaseAgent
+        registry, tools, policy, ledger = mock_deps
+
+        def _bad_invoke(self, user_prompt: str, max_output_tokens: int | None = None) -> str:
+            return "not valid json"
+
+        with patch.object(BaseAgent, "_invoke", _bad_invoke):
+            wf = ResearchWorkflow(registry, tools, policy, ledger)
+            results = wf.run(tmp_path, metadata={"topic": "AI testing"})
+
+        # Runner halts after gather failure; summarize and report are skipped
+        assert len(results) == 1
+        assert results[0].step_id == "gather"
+        assert not results[0].success
+
+    def test_research_workflow_empty_sources_graceful(self, mock_deps, tmp_path: Path) -> None:
+        from workflows.research import ResearchWorkflow
+        from workflows.research.agents.base import BaseAgent
+        registry, tools, policy, ledger = mock_deps
+
+        def _empty_invoke(self, user_prompt: str, max_output_tokens: int | None = None) -> str:
+            schema_name = self.output_schema.__name__
+            if schema_name == "GatherResult":
+                return json.dumps({"sources": [], "search_queries": [], "raw_findings": ""})
+            # Fall back to default fake for summarize / report
+            return _fake_invoke(self, user_prompt, max_output_tokens)
+
+        with patch.object(BaseAgent, "_invoke", _empty_invoke):
+            wf = ResearchWorkflow(registry, tools, policy, ledger)
+            results = wf.run(tmp_path, metadata={"topic": "AI testing"})
+
+        assert len(results) == 3
+        assert all(r.success for r in results)
+        # Verify gather carried empty sources
+        gather_parsed = results[0].metadata.get("parsed", {})
+        assert gather_parsed.get("sources") == []
