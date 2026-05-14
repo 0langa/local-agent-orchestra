@@ -63,10 +63,13 @@ All side-effecting operations are mediated by the `PolicyEngine` (`core/policy_e
 
 | Level | Examples | Default Behavior |
 |-------|----------|-----------------|
+| `NONE` | Filesystem read, list, stat | Auto-approved |
 | `LOW` | Read file, list directory | Auto-approved |
-| `MEDIUM` | Write file, execute safe command | Requires confirmation |
-| `HIGH` | Delete files, install packages | Blocked by default |
+| `MEDIUM` | Filesystem write/copy, execute safe command | Requires confirmation |
+| `HIGH` | Shell execute, delete files, install packages | Blocked by default |
 | `CRITICAL` | System-level operations | Always blocked |
+
+Operation-level risk resolution adjusts the effective risk within a tool. For example, `filesystem` read/list/stat resolve to `NONE`, while `filesystem` write/copy resolve to `MEDIUM`.
 
 ### How Approval Works
 
@@ -77,14 +80,22 @@ When a tool invocation requires approval:
 3. The user can `grant` or `deny` the request
 4. The decision is recorded as an `APPROVAL_GRANTED` or `APPROVAL_DENIED` event
 
+#### Interface Behavior
+
+- **CLI**: Medium-risk operations prompt interactively (`Grant approval? [y/N]`). If granted, the request is re-invoked with the approved decision.
+- **API / Web UI**: Medium-risk operations return an approval-required payload (HTTP 409) without executing. The caller must explicitly grant approval before the tool runs.
+- **Workflow internal**: Coding and other workflows evaluate policy through their own agent adapters, which remain autonomous but must respect the same `PolicyEngine` rules.
+
 ---
 
 ## Policy Engine
 
-The `PolicyEngine` is the central safety gate for all tool invocations. Every tool call flows through:
+The `PolicyEngine` is the central safety gate for all tool invocations. Interface-facing tool calls flow through `ToolInvoker` (`core/tool_invocation.py`), which ensures a single policy-gated, ledger-audited path:
 
 ```
 Tool Call Request
+    ↓
+ToolInvoker.lookup — resolves tool and operation-level risk
     ↓
 PrivacyEnforcer — checks privacy mode compliance
     ↓
@@ -94,7 +105,7 @@ BudgetEnforcer — checks token/time/iteration budgets
     ↓
 Tool Execution (if allowed)
     ↓
-Event emitted to ledger
+POLICY_EVALUATED + TOOL_CALLED + TOOL_RESULT_RECEIVED events emitted to ledger
 ```
 
 The engine:

@@ -152,7 +152,7 @@ python -m interfaces.cli.cli doctor --skip-connectivity
 
 ## Phase 1 - Safety And Runtime Spine
 
-**Status:** In progress. First slice complete: API/Web tool invocation now routes through a centralized policy-gated service with operation-level filesystem risk and approval-required responses for medium-risk operations.
+**Status:** Complete as of 2026-05-14. All user-facing interface tool invocations (API, Web UI, CLI copy) route through `ToolInvoker`. Operation-level filesystem risk resolves read/list/stat to none and write/copy to medium. CLI grants/denies interactively. Core no longer imports product-specific implementations (`agents.self_improving`, `monitoring`). State transitions emit canonical `STATE_TRANSITION` events. Safety docs describe actual behavior.
 
 **Goal:** Ensure every side effect flows through one policy-gated, ledger-audited path.
 

@@ -2,6 +2,15 @@
 
 ## 2026-05-14
 
+### Phase 1 Complete — Safety And Runtime Spine
+- Unified tool invocation path across API, Web UI, and CLI (`core/tool_invocation.py`, `interfaces/api_server/app.py`, `interfaces/web_ui/app.py`, `interfaces/cli/cli.py`).
+- Operation-level filesystem risk: read/list/stat → none, write/copy → medium.
+- CLI interactive approval UX for medium-risk operations.
+- Core runtime no longer imports `agents.self_improving` or `monitoring.metrics`; injected via `RunHook` protocol from `interfaces/run_hooks.py`.
+- Runtime state transitions emit canonical `EventType.STATE_TRANSITION` with legacy JSONL mirror preserved.
+- Updated `docs/SAFETY.md` to describe unified `ToolInvoker` path, operation-level risk, and interface approval behavior.
+- Marked `BASELINE-ROADMAP.md` Phase 1 as complete.
+
 ### Phase 1 Slice 4 — State Machine Event Truth
 - `RuntimeStateMachine._record()` now emits `EventType.STATE_TRANSITION` via `ledger.emit_event()` instead of only writing legacy `state_transitions.jsonl` (`core/state_machine.py`).
 - Legacy `state_transitions.jsonl` mirror still written for backward compatibility.
