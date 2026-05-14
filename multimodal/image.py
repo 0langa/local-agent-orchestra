@@ -42,6 +42,23 @@ def _resolve_processor() -> MultimodalProcessor:
         except Exception as exc:
             logger.warning("Claude vision processor unavailable: %s", exc)
 
+    if provider == "auto":
+        try:
+            from config.config import load_team_config, ModelCapability
+            team = load_team_config()
+            for role, cfg in team.by_role().items():
+                caps = [c.lower() for c in (cfg.metadata.get("capabilities") or [])]
+                if ModelCapability.VISION.value in caps:
+                    from multimodal.generic_openai_vision import GenericOpenAIVisionProcessor
+                    return GenericOpenAIVisionProcessor(
+                        endpoint=cfg.endpoint,
+                        api_key=cfg.api_key,
+                        model=cfg.model,
+                        headers=cfg.headers,
+                    )
+        except Exception as exc:
+            logger.debug("Auto-resolution via team config failed: %s", exc)
+
     if provider != "auto":
         logger.warning("Unknown vision provider '%s', falling back to stub", provider)
 

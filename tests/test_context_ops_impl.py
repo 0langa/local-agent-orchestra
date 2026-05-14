@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from agentheim.vendor.aictx.config import AictxConfig
 from agentheim.vendor.aictx.llm.dry_run import DryRunProvider
 

@@ -709,6 +709,39 @@ def mcp_call_cmd(
     raise typer.Exit(code=1)
 
 
+@app.command("desktop")
+def desktop_cmd(
+    port: int = typer.Option(8765, "--port", help="Port for the web server."),
+    no_tray: bool = typer.Option(False, "--no-tray", help="Disable system tray icon."),
+) -> None:
+    """Launch the Agentheim desktop UI."""
+    from interfaces.desktop_ui.app import run_desktop_app
+
+    run_desktop_app(port=port, use_tray=not no_tray)
+
+
+@app.command("copy")
+def copy_cmd(
+    source: str = typer.Argument(..., help="Source path within workspace."),
+    destination: str = typer.Argument(..., help="Destination path within workspace."),
+) -> None:
+    """Copy a file or directory within the workspace."""
+    from tools.filesystem import FilesystemTool
+    from core.public_api import ToolContext
+
+    tool = FilesystemTool()
+    ctx = ToolContext()
+    result = tool.invoke(
+        {"operation": "copy", "path": source, "destination": destination},
+        ctx,
+    )
+    if result.success:
+        console.print(f"[green]Copied[/green] {source} -> {result.data}")
+    else:
+        console.print(f"[red]Error:[/red] {result.error}")
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     try:
         app()

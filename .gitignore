@@ -74,3 +74,8 @@ Agent-Team/
 
 # Local-only provider mock server and generated test profiles
 .localtest/
+
+# Local skill/memory scratch + planning notes
+.github/skills/
+NEXT-DEVELOPMENT-STEPS.md
+.kimi/memory.jsonl

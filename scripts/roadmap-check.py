@@ -191,6 +191,7 @@ SUBPROCESS_EXEMPTIONS = [
     'tools/mcp/client.py',                   # MCP client spawns MCP server subprocesses
     'tests/test_import_linting.py',          # Tests the checker itself; needs subprocess
     'tests/test_context_ops_impl.py',        # ContextOps tests spawn git for synthetic repos
+    'tests/test_negative_paths.py',          # Negative-path tests spawn git for dirty-repo scenarios
     '.localtest/run-live-ai-smoke.py',       # Local live-test harness (gitignored, not committed)
     # AICtx vendor imports (M1) — imported reference code; subprocess/git calls are
     # legitimate internal AICtx operations and will be mediated through ContextOps

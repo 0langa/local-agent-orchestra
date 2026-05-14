@@ -6,6 +6,7 @@ Operations: read, write, list, stat with path confinement.
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +22,10 @@ class FilesystemTool(BaseTool):
         schema = ToolSchema(
             description="Read, write, list, and stat files within the workspace.",
             parameters={
-                "operation": ParamSchema(type="string", description="Operation: read, write, list, stat", enum=["read", "write", "list", "stat"], required=True),
+                "operation": ParamSchema(type="string", description="Operation: read, write, list, stat, copy", enum=["read", "write", "list", "stat", "copy"], required=True),
                 "path": ParamSchema(type="string", description="Relative path within workspace", required=True),
                 "content": ParamSchema(type="string", description="Content for write operation", required=False),
+                "destination": ParamSchema(type="string", description="Destination path for copy operation", required=False),
             },
             returns=ReturnSchema(type="any", description="Operation result"),
         )
@@ -74,6 +76,9 @@ class FilesystemTool(BaseTool):
             return self._list(target)
         if operation == "stat":
             return self._stat(target)
+        if operation == "copy":
+            raw_dest = params.get("destination", "")
+            return self._copy(target, raw_dest, context)
 
         return ToolResult(success=False, error=f"Unknown operation: {operation}")
 
@@ -124,6 +129,29 @@ class FilesystemTool(BaseTool):
                     "is_file": target.is_file(),
                     "is_dir": target.is_dir(),
                 },
+            )
+        except OSError as exc:
+            return ToolResult(success=False, error=str(exc))
+
+    def _copy(self, source: Path, raw_dest: str, context: ToolContext) -> ToolResult:
+        if not source.exists():
+            return ToolResult(success=False, error=f"Source not found: {source}")
+        try:
+            dest = self._resolve(raw_dest, context)
+        except ToolSafetyError as exc:
+            return ToolResult(success=False, error=str(exc))
+        if dest.exists():
+            return ToolResult(success=False, error=f"Destination already exists: {dest}")
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_dir():
+                shutil.copytree(source, dest)
+            else:
+                shutil.copy2(source, dest)
+            return ToolResult(
+                success=True,
+                data=str(dest.relative_to(self.repo_root)),
+                metadata={"source": str(source.relative_to(self.repo_root)), "is_dir": source.is_dir()},
             )
         except OSError as exc:
             return ToolResult(success=False, error=str(exc))

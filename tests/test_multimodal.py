@@ -27,6 +27,7 @@ class TestImageTool:
         from core.tool_protocol import ToolContext
 
         tool = ImageTool()
+        tool._processor = StubMultimodalProcessor()
         result = tool.invoke({"operation": "describe", "image_b64": "abc"}, ToolContext())
         assert result.success is True
         assert "not configured" in result.data["description"]
@@ -35,6 +36,7 @@ class TestImageTool:
         from core.tool_protocol import ToolContext
 
         tool = ImageTool()
+        tool._processor = StubMultimodalProcessor()
         result = tool.invoke({"operation": "ocr", "image_b64": "abc"}, ToolContext())
         assert result.success is True
         assert "not configured" in result.data["text"]

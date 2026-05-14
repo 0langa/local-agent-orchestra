@@ -15,6 +15,10 @@ Note:
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.e2e, pytest.mark.slow]
+
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path

@@ -4,13 +4,22 @@
 
 ```powershell
 pip install -e .
-pytest -q
+pytest -q                # ~30s — fast subset (excludes stress/e2e/lint)
+pytest -q -n auto        # ~15s — parallel fast subset (requires pytest-xdist)
 ```
 
 ## Full Suite
 
 ```powershell
-pytest -q tests/
+pytest -q --override-ini="addopts="          # ~2min — all tests including slow
+pytest -q --override-ini="addopts=" -n auto  # ~1min — parallel full suite
+```
+
+## Slow Tests Only
+
+```powershell
+pytest -q -m slow       # stress tests, integration tests, lint checks
+pytest -q -m e2e        # real browser / network end-to-end tests
 ```
 
 ## Targeted Subsets

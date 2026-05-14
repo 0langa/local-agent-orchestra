@@ -219,6 +219,7 @@ __all__ = [
     "VerificationError",
     # Repo helpers
     "inspect_repository",
+    "safe_text_excerpt",
     # Deprecated — still exported for backward compatibility
     "build_context_pack",
     "ContextPacker",

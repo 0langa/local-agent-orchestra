@@ -2,6 +2,36 @@
 
 ## 2026-05-14
 
+### Test Suite Optimization
+- Marked 35 slow tests (`@pytest.mark.slow`) across stress, integration, e2e, and lint check suites
+- Default `pytest` now runs 790 fast tests in ~27s instead of 825 tests in ~122s
+- Parallel execution (`pytest -n auto`) runs fast subset in ~15s (requires pytest-xdist)
+- Updated `pyproject.toml` pytest config and `devtest/all-test-commands.md` with new commands
+
+### Negative / Failure-Mode Tests
+- Added `tests/test_negative_paths.py` covering state machine invalid transitions, coding runtime planning failure, dirty repo blocking, model registry missing role, and filesystem tool safety boundaries
+
+### Filesystem Copy Operation
+- Added `copy` operation to `FilesystemTool` supporting files and directories with path confinement (`tools/filesystem/__init__.py`)
+- Added `agentheim copy <source> <destination>` CLI command (`interfaces/cli/cli.py`)
+- Added `tests/test_filesystem_tool.py` with coverage for file copy, directory copy, missing source, existing destination, and path-escape safety
+
+### DesktopUI
+- Rewrote `interfaces/desktop_ui/app.py` with pywebview as primary engine (lighter than PyQt6, uses OS native webview)
+- Added system tray icon with Show / Open in Browser / Quit menu (pystray)
+- Added server health-check (`_wait_for_server`) before opening window
+- Added `agentheim desktop [--port PORT] [--no-tray]` CLI command
+- Added `[desktop]` optional dependencies: `pywebview>=5.0`, `pystray>=0.19`
+- Expanded `tests/test_desktop_ui.py` with mock-based tests for all fallback tiers and CLI command
+
+### Vision / Multimodal Auto-Resolution
+- Added `GenericOpenAIVisionProcessor` supporting any OpenAI-compatible chat completions endpoint (`multimodal/generic_openai_vision.py`)
+- Updated `_resolve_processor()` to auto-discover vision-capable providers from the active Agentheim profile when no explicit `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` is set; Azure Foundry `gpt-4.1` now works out of the box for `multimodal.image` describe + OCR operations (`multimodal/image.py`)
+- Verified `describe_image` and `extract_text_from_image` end-to-end with Azure Foundry `gpt-4.1`
+
+### Bug Fixes
+- Added missing `safe_text_excerpt` to `core.public_api.__all__` (`core/public_api.py`)
+
 ### Research Workflow Happy Path
 - Fixed `SummarizerAgent._parse()` to normalize `summaries[]` items: `url`/`link`/`source`, `key_points`/`summary`/`findings`/`description`/`points`, `credibility`/`trustworthiness`/`reliability` (`workflows/research/agents/summarizer.py`)
 - Fixed `SummarizerAgent._parse()` to normalize `conflicts[]` and `gaps[]` dict items to strings
