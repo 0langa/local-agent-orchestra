@@ -49,6 +49,8 @@ In the current implementation, read-oriented endpoints such as `/api/health`, `/
 
 Configured keys are loaded from the `AI_TEAM_API_KEYS` environment variable.
 
+AI provider API keys are not loaded from `.env`. They are stored through Agentheim provider profiles and secret refs.
+
 ---
 
 ## Rate Limiting
@@ -124,6 +126,36 @@ POST /api/presets/{preset_id}/run
 ```
 
 Run a preset with the provided inputs.
+
+### Providers
+
+#### List Provider Adapters
+```
+GET /api/providers
+```
+
+Returns supported provider adapter ids and import/configuration status.
+
+#### List Provider Templates
+```
+GET /api/providers/templates
+```
+
+Returns provider setup templates, auth modes, endpoints, capability defaults, and source documentation URLs.
+
+#### Add Provider
+```
+POST /api/providers
+```
+
+Requires `X-API-Key`. Body: `provider_id`, `template`, `model`, `role`, optional `endpoint`, optional `api_key`, optional `capabilities`. Secrets are written to the configured secret backend and are never returned.
+
+#### Assign Provider Model
+```
+POST /api/providers/assign
+```
+
+Requires `X-API-Key`. Body: `profile`, `role`, `provider_id`, `model`, `capabilities`.
 
 ### Memory
 

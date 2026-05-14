@@ -43,9 +43,11 @@ from tools.mcp.config import load_mcp_config
 from workflows.coding.runtime import plan_task, run_task
 
 from interfaces.cli.ctx_commands import ctx_app
+from interfaces.cli.provider_commands import provider_app
 
 app = typer.Typer(help="Local-first three-agent runtime.")
 app.add_typer(ctx_app, name="ctx")
+app.add_typer(provider_app, name="provider")
 console = Console()
 
 
@@ -511,10 +513,15 @@ def doctor_cmd(
     pkg_detail = "all present" if not missing else f"missing: {', '.join(missing)}"
     checks.append(("Required packages", pkg_status, pkg_detail))
 
-    # Provider env vars
-    provider_envs = ["AI_TEAM_PROVIDER_IDS", "AWS_ACCESS_KEY_ID", "BEDROCK_MODEL_ID"]
-    has_provider = any(os.getenv(ev) for ev in provider_envs)
-    checks.append(("Provider config", "PASS" if has_provider else "WARN", "Provider configured" if has_provider else "No provider env vars found"))
+    # Provider profiles
+    try:
+        config = load_team_config()
+        has_provider = bool(config.providers and config.models)
+        detail = f"profile={config.profile_name}; providers={len(config.providers)}; models={len(config.models)}"
+    except Exception as exc:
+        has_provider = False
+        detail = str(exc)
+    checks.append(("Provider profile", "PASS" if has_provider else "WARN", detail))
 
     # Writable .ai-team/
     ai_team_path = Path(".ai-team")

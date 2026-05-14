@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -45,15 +46,46 @@ class TestCliCommands:
         assert result.exit_code == 0
         assert "ping-models" in result.output
 
-    def test_ping_models_exits_nonzero_on_failure(self) -> None:
+    def test_ping_models_exits_nonzero_on_failure(self, tmp_path) -> None:
         """AH-AUDIT-004: failing pings must exit nonzero."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        (config_dir / "providers.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "default_profile": "default",
+                    "profiles": {
+                        "default": {
+                            "name": "default",
+                            "providers": {
+                                "default": {
+                                    "id": "default",
+                                    "kind": "openai_compatible",
+                                    "endpoint": "https://api.openai.com/v1",
+                                    "auth_mode": "none",
+                                    "timeout_seconds": 60,
+                                    "headers": {},
+                                    "metadata": {},
+                                }
+                            },
+                            "models": {
+                                "planner": {
+                                    "id": "planner",
+                                    "role": "planner",
+                                    "provider": "default",
+                                    "model": "gpt-4o-mini",
+                                    "capabilities": ["text", "json"],
+                                }
+                            },
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         env = {
-            "AI_TEAM_PROVIDER_IDS": "default",
-            "AI_TEAM_PROVIDER_DEFAULT_TYPE": "openai_compatible",
-            "AI_TEAM_PROVIDER_DEFAULT_ENDPOINT": "https://api.openai.com/v1",
-            "AI_TEAM_PROVIDER_DEFAULT_API_KEY_ENV": "OPENAI_API_KEY",
-            "OPENAI_API_KEY": "sk-fake",
-            "AI_TEAM_MODEL_PLANNER_NAME": "gpt-4o-mini",
+            "AGENTHEIM_CONFIG_DIR": str(config_dir),
         }
         with patch("providers.openai_v1.OpenAIV1Provider.invoke") as mock_invoke:
             mock_invoke.side_effect = Exception("401 Unauthorized")

@@ -19,10 +19,11 @@ class OpenAIV1Provider(ModelProvider):
         )
 
     def invoke(self, request: ModelRequest) -> ModelResponse:
+        self.validate_request(request)
         messages: list[dict[str, str]] = []
         if request.system_prompt:
             messages.append({"role": "system", "content": request.system_prompt})
-        messages.append({"role": "user", "content": request.user_prompt})
+        messages.append({"role": "user", "content": request.user_content()})
 
         create_kwargs = {
             "model": self.config.model,

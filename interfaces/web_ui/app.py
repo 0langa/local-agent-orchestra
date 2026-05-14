@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from config.config import list_provider_templates, load_profiles_document
 from core.public_api import (
     RunExecutor,
     RunRecord,
@@ -71,6 +72,16 @@ class ExecuteRequest(BaseModel):
 class ExecuteResponse(BaseModel):
     run_id: str
     status: str
+
+
+class ProviderTemplateItem(BaseModel):
+    kind: str
+    display_name: str
+    endpoint: str
+    auth_mode: str
+    provider_type: str
+    capabilities: list[str] = Field(default_factory=list)
+    docs_url: str
 
 
 class MemoryReadResponse(BaseModel):
@@ -275,6 +286,38 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             )
             for p in PRESET_REGISTRY.list()
         ]
+
+    @app.get("/api/providers/templates", response_model=list[ProviderTemplateItem])
+    def provider_templates() -> list[ProviderTemplateItem]:
+        return [ProviderTemplateItem(**item) for item in list_provider_templates()]
+
+    @app.get("/api/providers/profiles")
+    def provider_profiles() -> dict[str, Any]:
+        try:
+            document = load_profiles_document()
+        except Exception as exc:
+            return {"configured": False, "error": str(exc), "profiles": []}
+        return {
+            "configured": True,
+            "default_profile": document.default_profile,
+            "profiles": [
+                {
+                    "name": profile.name,
+                    "providers": [
+                        {
+                            "id": provider.id,
+                            "kind": provider.kind,
+                            "auth_mode": provider.auth_mode,
+                            "endpoint": provider.endpoint,
+                            "has_secret": bool(provider.secret_ref),
+                        }
+                        for provider in profile.providers.values()
+                    ],
+                    "models": [binding.model_dump() for binding in profile.models.values()],
+                }
+                for profile in document.profiles.values()
+            ],
+        }
 
     @app.post("/api/presets/{preset_id}/run", response_model=ExecuteResponse)
     def run_preset(preset_id: str, body: ExecuteRequest) -> ExecuteResponse:
@@ -546,6 +589,10 @@ def _dashboard_html() -> str:
     <h2>Presets</h2>
     <ul id="presets-list"><li class="loading">Loading...</li></ul>
   </div>
+  <div class="card">
+    <h2>Provider Center</h2>
+    <ul id="providers-list"><li class="loading">Loading...</li></ul>
+  </div>
 </div>
 <div class="ctx-section">
   <h2>Context Operations</h2>
@@ -600,11 +647,12 @@ function riskClass(level) {
 }
 async function loadAll() {
   const status = document.getElementById('status');
-  const [health, tools, workflows, presets] = await Promise.all([
+  const [health, tools, workflows, presets, providers] = await Promise.all([
     fetchJSON('/api/health'),
     fetchJSON('/api/tools'),
     fetchJSON('/api/workflows'),
-    fetchJSON('/api/presets')
+    fetchJSON('/api/presets'),
+    fetchJSON('/api/providers/profiles')
   ]);
 
   if (health.error) {
@@ -625,6 +673,13 @@ async function loadAll() {
   const presetList = document.getElementById('presets-list');
   if (presets.error) { presetList.innerHTML = '<li class="error">' + presets.error + '</li>'; }
   else { presetList.innerHTML = presets.map(p => '<li>' + p.preset_id + '</li>').join(''); }
+
+  const providerList = document.getElementById('providers-list');
+  if (providers.error) { providerList.innerHTML = '<li class="error">' + providers.error + '</li>'; }
+  else if (!providers.configured) { providerList.innerHTML = '<li class="error">' + providers.error + '</li>'; }
+  else {
+    providerList.innerHTML = providers.profiles.flatMap(p => p.providers.map(provider => '<li>' + p.name + ' / ' + provider.id + '<span class="badge">' + provider.kind + '</span></li>')).join('') || '<li class="loading">No providers configured</li>';
+  }
 }
 async function ctxAction(action) {
   const path = document.getElementById('ctx-project-path').value || '.';

@@ -13,7 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from config.config import ConfigError
+from config.config import (
+    ConfigError,
+    ModelBinding,
+    ModelRole,
+    ProfilesDocument,
+    TeamProfile,
+    get_secret_store,
+    list_provider_templates,
+    load_profiles_document,
+    make_secret_ref,
+    provider_account_from_template,
+    save_profiles_document,
+)
 from core.public_api import (
     DEFAULT_PROVIDER_MAP,
     RunExecutor,
@@ -126,6 +138,40 @@ class ProviderListItem(BaseModel):
     healthy: bool = False    # Implemented and not known-broken
     configured: bool = False  # Has live config/env (best-effort)
     error: str | None = None
+
+
+class ProviderTemplateItem(BaseModel):
+    kind: str
+    display_name: str
+    endpoint: str
+    auth_mode: str
+    provider_type: str
+    capabilities: list[str] = Field(default_factory=list)
+    docs_url: str
+
+
+class ProviderAddRequest(BaseModel):
+    provider_id: str
+    template: str
+    model: str
+    role: ModelRole = ModelRole.PLANNER
+    profile: str = "default"
+    endpoint: str | None = None
+    api_key: str | None = None
+    capabilities: list[str] = Field(default_factory=lambda: ["text", "json"])
+
+
+class ProviderAssignRequest(BaseModel):
+    profile: str = "default"
+    role: ModelRole
+    provider_id: str
+    model: str
+    capabilities: list[str] = Field(default_factory=lambda: ["text", "json"])
+
+
+class ProviderMutationResponse(BaseModel):
+    status: str
+    profile: str
 
 
 class RunStatusResponse(BaseModel):
@@ -312,35 +358,13 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         except Exception as exc:
             return False, False, False, str(exc)
 
-        # Check implementation status by instantiating with dummy config
-        # and invoking with a dummy request. NotImplementedError in
-        # either path means the adapter exists but is not implemented.
         try:
-            from config.config import ProviderConfig
-            from providers.base import ModelRequest, ModelRole
+            from config.config import AgentModelConfig, ModelRole
 
-            dummy = ProviderConfig(
-                id=provider_id,
-                provider_type="test",
-                endpoint="http://localhost",
-                api_key_env="TEST_KEY",
-                timeout_seconds=1,
-                headers={},
-            )
-            instance = cls(dummy)
-            instance.invoke(
-                ModelRequest(
-                    role=ModelRole.PLANNER,
-                    system_prompt="",
-                    user_prompt="ping",
-                )
-            )
+            cls(AgentModelConfig(role=ModelRole.PLANNER, provider=provider_id, provider_type=provider_id, endpoint="http://localhost", api_key="-", model="test"))
         except NotImplementedError as exc:
             return True, False, False, f"not implemented: {exc}"
         except Exception as exc:
-            # Dummy config is intentionally invalid. Any exception here
-            # means the adapter exists but cannot be instantiated/invoked
-            # with valid-looking config → mark as not healthy.
             return True, False, False, f"adapter error: {exc}"
 
         # Best-effort configured check
@@ -348,7 +372,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         try:
             from config.config import load_team_config
             team = load_team_config()
-            configured = any(m.provider == provider_id for m in team.models.values())
+            configured = any(provider.provider_type == provider_id for provider in team.providers.values())
         except Exception:
             pass
 
@@ -587,12 +611,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     @app.get("/api/providers", response_model=list[ProviderListItem], tags=["providers"])
     def list_providers() -> list[ProviderListItem]:
         """List providers and their health status."""
-        providers = [
-            ProviderListItem(provider_id="openai_v1"),
-            ProviderListItem(provider_id="aws_bedrock"),
-            ProviderListItem(provider_id="azure_foundry"),
-            ProviderListItem(provider_id="oci_genai"),
-        ]
+        providers = [ProviderListItem(provider_id=provider_id) for provider_id in sorted(DEFAULT_PROVIDER_MAP)]
         for p in providers:
             available, healthy, configured, error = _check_provider_health(p.provider_id)
             p.available = available
@@ -600,6 +619,55 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             p.configured = configured
             p.error = error
         return providers
+
+    @app.get("/api/providers/templates", response_model=list[ProviderTemplateItem], tags=["providers"])
+    def provider_templates() -> list[ProviderTemplateItem]:
+        return [ProviderTemplateItem(**item) for item in list_provider_templates()]
+
+    @app.post("/api/providers", response_model=ProviderMutationResponse, tags=["providers"], dependencies=[Depends(rate_limiter.check)])
+    def add_provider(request: ProviderAddRequest, api_key: str = Depends(verify_api_key)) -> ProviderMutationResponse:
+        try:
+            document = load_profiles_document()
+        except ConfigError:
+            document = ProfilesDocument(profiles={request.profile: TeamProfile(name=request.profile)})
+        profile = document.profiles.setdefault(request.profile, TeamProfile(name=request.profile))
+        secret_ref = make_secret_ref(request.provider_id)
+        provider = provider_account_from_template(request.provider_id, request.template, endpoint=request.endpoint, secret_ref=secret_ref)
+        if provider.auth_mode in {"api_key", "bearer", "x_api_key", "bedrock_api_key"}:
+            if not request.api_key:
+                raise HTTPException(status_code=400, detail="api_key required for this provider auth mode")
+            get_secret_store().set(secret_ref, request.api_key)
+        else:
+            provider = provider.model_copy(update={"secret_ref": None})
+        profile.providers[request.provider_id] = provider
+        profile.models[request.role.value] = ModelBinding(
+            id=request.role.value,
+            role=request.role,
+            provider=request.provider_id,
+            model=request.model,
+            capabilities=request.capabilities,
+        )
+        document.default_profile = request.profile
+        save_profiles_document(document)
+        return ProviderMutationResponse(status="written", profile=request.profile)
+
+    @app.post("/api/providers/assign", response_model=ProviderMutationResponse, tags=["providers"], dependencies=[Depends(rate_limiter.check)])
+    def assign_provider(request: ProviderAssignRequest, api_key: str = Depends(verify_api_key)) -> ProviderMutationResponse:
+        document = load_profiles_document()
+        profile = document.profiles.get(request.profile)
+        if profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile '{request.profile}' not found")
+        if request.provider_id not in profile.providers:
+            raise HTTPException(status_code=404, detail=f"Provider '{request.provider_id}' not found")
+        profile.models[request.role.value] = ModelBinding(
+            id=request.role.value,
+            role=request.role,
+            provider=request.provider_id,
+            model=request.model,
+            capabilities=request.capabilities,
+        )
+        save_profiles_document(document)
+        return ProviderMutationResponse(status="written", profile=request.profile)
 
     @app.get("/api/runs/{run_id}", response_model=RunStatusResponse, tags=["runs"])
     def get_run_status(run_id: str) -> RunStatusResponse:

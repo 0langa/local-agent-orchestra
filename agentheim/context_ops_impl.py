@@ -250,13 +250,27 @@ class AictxContextOps(ContextOps):
         allow_dirty: bool = False,
         provider: Any | None = None,
     ) -> WriteReport:
-        """Run the full local Phase-1 pipeline and return enriched report.
+        """Run the full local Phase-1 pipeline and return enriched report."""
+        if allow_ai:
+            if provider is None:
+                from config.config import ModelRole, load_team_config
+                from core.model_registry import build_model_registry
 
-        .. note::
-            The *provider* parameter is accepted for API consistency with
-            :meth:`generate`, but the vendor pipeline currently uses its own
-            default provider factory and cannot inject a custom provider.
-        """
+                team_config = load_team_config()
+                model_config = team_config.resolve_role(ModelRole.CONTEXT)
+                provider = build_model_registry(team_config).create_provider(model_config)
+            inventory = self.scan(repo_root)
+            context_plan = self.plan(inventory, scope=scope)
+            generated = self.generate(repo_root, context_plan, provider=provider)
+            written = self.write(repo_root, generated, write_mode=write_mode)
+            return WriteReport(
+                generated_files=written.generated_files,
+                lockfile_path=written.lockfile_path,
+                patch_text=written.patch_text,
+                run_report=written.run_report,
+                timing=written.timing or {},
+                entropy=written.entropy or {},
+            )
         report = run_local_context_pipeline(
             repo_root=repo_root,
             run_id=run_id,

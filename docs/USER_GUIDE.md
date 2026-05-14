@@ -53,17 +53,9 @@ agentheim doctor
 ### 1. Configure a Provider
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` with your provider details:
-
-```env
-AI_TEAM_PROVIDER_IDS=default
-AI_TEAM_PROVIDER_DEFAULT_TYPE=openai_compatible
-AI_TEAM_PROVIDER_DEFAULT_ENDPOINT=https://api.openai.com/v1
-AI_TEAM_PROVIDER_DEFAULT_API_KEY_ENV=OPENAI_API_KEY
-OPENAI_API_KEY=sk-your-key-here
+agentheim provider add openai --template openai_v1 --model gpt-4o-mini --role planner
+agentheim provider assign executor --provider openai --model gpt-4o-mini
+agentheim provider assign verifier --provider openai --model gpt-4o-mini
 ```
 
 ### 2. Verify Connectivity
@@ -86,19 +78,14 @@ agentheim start codebase-assistant --input repo=./my-project --input task="Revie
 
 ## Configuration
 
-Agentheim is configured entirely through environment variables. You can use a `.env` file for convenience.
+AI providers are configured through Agentheim provider profiles. Secrets are stored in the OS keychain by default, with encrypted local vault fallback. `.env` provider setup is migration-only and is not loaded at runtime.
 
 ### Provider Configuration
 
-```env
-# Which providers to load (comma-separated)
-AI_TEAM_PROVIDER_IDS=default
-
-# For each provider, set these variables:
-AI_TEAM_PROVIDER_DEFAULT_TYPE=openai_compatible
-AI_TEAM_PROVIDER_DEFAULT_ENDPOINT=https://api.openai.com/v1
-AI_TEAM_PROVIDER_DEFAULT_API_KEY_ENV=OPENAI_API_KEY
-AI_TEAM_PROVIDER_DEFAULT_TIMEOUT_SECONDS=60
+```bash
+agentheim provider templates
+agentheim provider add openai --template openai_v1 --model gpt-4o-mini --role planner
+agentheim provider list
 ```
 
 #### Supported Provider Types
@@ -106,45 +93,33 @@ AI_TEAM_PROVIDER_DEFAULT_TIMEOUT_SECONDS=60
 | Type | Description | Example Endpoint |
 |------|-------------|-----------------|
 | `openai_compatible` | Any OpenAI-compatible API | `https://api.openai.com/v1` |
+| `openai_v1` | OpenAI API | `https://api.openai.com/v1` |
 | `azure_foundry` | Azure OpenAI Service | `https://your-resource.openai.azure.com/` |
 | `aws_bedrock` | AWS Bedrock (uses boto3) | — |
 | `oci_genai` | OCI GenAI (uses OCI SDK) | — |
+| `anthropic` | Anthropic Messages API | `https://api.anthropic.com` |
+| `gemini` | Google Gemini API key API | `https://generativelanguage.googleapis.com` |
+| `vertex_ai` | Google Vertex AI with ADC | — |
+| `cohere` | Cohere v2 API | `https://api.cohere.com` |
+| `perplexity` | Perplexity API | `https://api.perplexity.ai` |
+| `ollama_cloud` | Ollama cloud API | `https://ollama.com/api` |
 
 #### Multiple Providers
 
-```env
-AI_TEAM_PROVIDER_IDS=openai,ollama
-
-AI_TEAM_PROVIDER_OPENAI_TYPE=openai_compatible
-AI_TEAM_PROVIDER_OPENAI_ENDPOINT=https://api.openai.com/v1
-AI_TEAM_PROVIDER_OPENAI_API_KEY_ENV=OPENAI_API_KEY
-
-AI_TEAM_PROVIDER_OLLAMA_TYPE=openai_compatible
-AI_TEAM_PROVIDER_OLLAMA_ENDPOINT=http://localhost:11434/v1
-AI_TEAM_PROVIDER_OLLAMA_API_KEY_ENV=OLLAMA_API_KEY
+```bash
+agentheim provider add openai --template openai_v1 --model gpt-4o --role planner
+agentheim provider add kimi --template kimi_moonshot --model kimi-k2 --role executor
+agentheim provider add claude --template anthropic --model claude-sonnet-4-5 --role verifier
 ```
 
 ### Model Configuration
 
-#### Option A: Explicit model registry (recommended)
+Bind each role to a provider/model pair:
 
-```env
-AI_TEAM_MODELS_JSON=[
-  {"id":"planner","role":"planner","provider":"default","model_name":"gpt-4o","capabilities":["plan","reasoning","json"]},
-  {"id":"executor","role":"executor","provider":"default","model_name":"gpt-4o-mini","capabilities":["code_edit","json"]},
-  {"id":"verifier","role":"verifier","provider":"default","model_name":"gpt-4o","capabilities":["verify","json"]}
-]
-```
-
-#### Option B: Per-role environment variables
-
-```env
-AI_TEAM_MODEL_PLANNER_PROVIDER=default
-AI_TEAM_MODEL_PLANNER_NAME=gpt-4o
-AI_TEAM_MODEL_EXECUTOR_PROVIDER=default
-AI_TEAM_MODEL_EXECUTOR_NAME=gpt-4o-mini
-AI_TEAM_MODEL_VERIFIER_PROVIDER=default
-AI_TEAM_MODEL_VERIFIER_NAME=gpt-4o
+```bash
+agentheim provider assign planner --provider openai --model gpt-4o
+agentheim provider assign executor --provider kimi --model kimi-k2
+agentheim provider assign verifier --provider claude --model claude-sonnet-4-5
 ```
 
 ### Workflow Model Roles
@@ -158,19 +133,16 @@ AI_TEAM_MODEL_VERIFIER_NAME=gpt-4o
 | Docs Maintenance | `planner`, `executor`, `verifier` |
 | GitHub Maintenance | `planner`, `executor` |
 | Command Assistant | `planner`, `executor` |
+| Context Operations | `context` |
 
-### Full Environment Reference
+### Provider Profile Reference
 
-| Variable | Default | Description |
+| Setting | Default | Description |
 |----------|---------|-------------|
-| `AI_TEAM_PROVIDER_IDS` | `default` | Comma-separated provider IDs |
-| `AI_TEAM_PROVIDER_*_TYPE` | `openai_compatible` | Provider adapter type |
-| `AI_TEAM_PROVIDER_*_ENDPOINT` | (required) | API base URL |
-| `AI_TEAM_PROVIDER_*_API_KEY_ENV` | (required) | Env var containing API key |
-| `AI_TEAM_PROVIDER_*_TIMEOUT_SECONDS` | `60` | Request timeout |
-| `AI_TEAM_MODELS_JSON` | (built-in defaults) | Full model registry JSON |
-| `AI_TEAM_MODEL_*_PROVIDER` | `default` | Provider for role |
-| `AI_TEAM_MODEL_*_NAME` | (placeholder) | Model name for role |
+| Profile name | `default` | Active provider profile |
+| Secret backend | OS keychain | Falls back to encrypted local vault |
+| Project pointer | `.ai-team/provider-profile.json` | Optional committed profile selector without secrets |
+| Secret ref | `secret://provider/<id>/api_key` | Stored in profile, resolves through vault/keychain |
 | `AI_TEAM_ENABLE_GITHUB` | `false` | Enable GitHub integration |
 | `AI_TEAM_ENABLE_MCP` | `false` | Enable MCP discovery |
 | `AI_TEAM_ENABLE_WEB` | `false` | Enable web research tool |
@@ -211,6 +183,10 @@ agentheim presets             # List available presets
 | `agentheim doctor` | Run system diagnostics |
 | `agentheim ping-models` | Test provider connectivity for all configured models |
 | `agentheim config-dump --redacted` | Show resolved configuration (secrets redacted) |
+| `agentheim provider templates` | List supported provider setup templates |
+| `agentheim provider add <id> --template <template> --model <model>` | Add provider and save secret securely |
+| `agentheim provider assign <role> --provider <id> --model <model>` | Bind a team role to a model |
+| `agentheim provider import-env` | One-time migration from old provider env vars |
 | `agentheim inspect --repo <path>` | Inspect a repository for context |
 | `agentheim plan <task> --repo <path>` | Plan a task without executing |
 | `agentheim run <task> --repo <path>` | Execute a task with mode selection |

@@ -71,6 +71,12 @@ DEFAULT_PROVIDER_MAP: dict[str, ProviderDescriptor] = {
     "azure_foundry": ProviderDescriptor(id="azure_foundry", import_path="providers.azure_foundry:AzureFoundryProvider"),
     "oci_genai": ProviderDescriptor(id="oci_genai", import_path="providers.oci_genai:OCIGenAIProvider"),
     "aws_bedrock": ProviderDescriptor(id="aws_bedrock", import_path="providers.aws_bedrock:AWSBedrockProvider"),
+    "anthropic": ProviderDescriptor(id="anthropic", import_path="providers.anthropic:AnthropicProvider"),
+    "gemini": ProviderDescriptor(id="gemini", import_path="providers.gemini:GeminiProvider"),
+    "vertex_ai": ProviderDescriptor(id="vertex_ai", import_path="providers.gemini:VertexAIProvider"),
+    "cohere": ProviderDescriptor(id="cohere", import_path="providers.cohere:CohereProvider"),
+    "perplexity": ProviderDescriptor(id="perplexity", import_path="providers.perplexity:PerplexityProvider"),
+    "ollama_cloud": ProviderDescriptor(id="ollama_cloud", import_path="providers.ollama_cloud:OllamaCloudProvider"),
 }
 
 

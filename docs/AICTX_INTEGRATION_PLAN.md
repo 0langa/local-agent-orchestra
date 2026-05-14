@@ -400,6 +400,7 @@ Remove duplicate provider/model governance.
 ### Notes
 - `AgentheimToAictxAdapter` bridges Agentheim `providers/base.py` to AICtx `llm/base.py`.
 - OCI GenAI provider is routed through the unified adapter.
+- `allow_ai=True` resolves the Agentheim `context` role from provider profiles when no provider is passed explicitly; AICtx does not own separate live-AI credentials.
 
 ---
 

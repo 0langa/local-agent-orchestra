@@ -61,15 +61,14 @@ class TestModelRegistry:
         with pytest.raises(ValueError, match="No model for role"):
             registry.resolve_model("verifier", "plan")
 
-    def test_from_team_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("TEST_API_KEY", "secret")
+    def test_from_team_config(self) -> None:
         team = TeamConfig(
             providers={
                 "default": ProviderConfig(
                     id="default",
                     provider_type="openai_compatible",
                     endpoint="http://test",
-                    api_key_env="TEST_API_KEY",
+                    api_key="secret",
                 ),
             },
             models={

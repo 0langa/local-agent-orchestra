@@ -19,6 +19,7 @@ class AWSBedrockProvider(ModelProvider):
     """Native AWS Bedrock provider via boto3 Converse API."""
 
     def invoke(self, request: ModelRequest) -> ModelResponse:
+        self.validate_request(request)
         try:
             import boto3
             from botocore.config import Config as BotoConfig
@@ -29,6 +30,10 @@ class AWSBedrockProvider(ModelProvider):
             ) from exc
 
         region = self._resolve_region()
+        if self.config.auth_mode == "bedrock_api_key" and self.config.api_key != "-":
+            import os
+
+            os.environ["AWS_BEARER_TOKEN_BEDROCK"] = self.config.api_key
         client = boto3.client(
             "bedrock-runtime",
             region_name=region,
@@ -42,7 +47,7 @@ class AWSBedrockProvider(ModelProvider):
             system_prompts = [{"text": request.system_prompt}]
 
         messages: list[dict[str, Any]] = [
-            {"role": "user", "content": [{"text": request.user_prompt}]},
+            {"role": "user", "content": self._content_blocks(request)},
         ]
 
         inference_config: dict[str, Any] = {}
@@ -107,3 +112,12 @@ class AWSBedrockProvider(ModelProvider):
         # Fallback — Bedrock is not available in all regions;
         # eu-central-1 is a common default for European users.
         return "eu-central-1"
+
+    def _content_blocks(self, request: ModelRequest) -> list[dict[str, Any]]:
+        blocks: list[dict[str, Any]] = [{"text": request.user_prompt}]
+        for part in request.content:
+            if part.type == "text" and part.text:
+                blocks.append({"text": part.text})
+            elif part.type == "image_url" and part.image_url:
+                blocks.append({"image": {"format": "png", "source": {"bytes": part.image_url}}})
+        return blocks

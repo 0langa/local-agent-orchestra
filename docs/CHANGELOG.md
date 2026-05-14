@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-14
+
+### Provider Profiles
+- Replaced AI provider `.env` runtime loading with provider profiles and vault-backed `secret://provider/<id>/<name>` refs.
+- Added provider CLI namespace for templates, add, list, use, assign, test, import-env, rotate-secret, and remove.
+- Added profile-backed provider templates for current providers plus Gemini, Vertex AI, Anthropic, Kimi/Moonshot, Mistral, Groq, DeepSeek, OpenRouter, Together AI, Cohere, Perplexity, Ollama, Ollama Cloud, and LM Studio.
+- Added native Gemini, Anthropic, Cohere, Perplexity, Vertex AI, and Ollama Cloud provider adapters plus multimodal request content parts.
+- Added API/Web provider template/profile surfaces and updated docs/test guidance for the new setup flow.
+
 ## 2026-05-13
 
 ### AICtx Integration — M6-M9 Complete

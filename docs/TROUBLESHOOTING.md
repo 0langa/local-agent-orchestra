@@ -70,31 +70,24 @@ PYTHONPATH="." pytest tests/ -q
 
 ### `doctor` reports missing provider
 
-Your `.env` file is either missing or the API key environment variable is not set.
+No provider profile is configured.
 
-1. Copy the example: `cp .env.example .env`
-2. Fill in your API key
-3. Verify: `agentheim doctor`
+1. Run `agentheim provider templates`
+2. Add a provider, for example `agentheim provider add openai --template openai_v1 --model gpt-4o-mini --role planner`
+3. Bind needed roles with `agentheim provider assign <role> --provider openai --model <model>`
+4. Verify with `agentheim doctor`
 
 ### Provider not connecting
 
 Check that:
 - The endpoint URL is correct and reachable
-- The API key environment variable name matches `AI_TEAM_PROVIDER_*_API_KEY_ENV`
-- The API key is actually set in your environment
+- The provider profile has the right auth mode
+- The provider secret was saved in keychain or encrypted vault
 - For local providers (Ollama, LM Studio), ensure the service is running
 
 ### Multiple providers not loading
 
-Ensure provider IDs are comma-separated with **no spaces**:
-
-```env
-# ✅ Correct
-AI_TEAM_PROVIDER_IDS=openai,ollama
-
-# ❌ Wrong
-AI_TEAM_PROVIDER_IDS=openai, ollama
-```
+Run `agentheim provider list`. If a provider is missing, add it again with `agentheim provider add` or migrate once with `agentheim provider import-env`.
 
 ---
 
@@ -112,11 +105,7 @@ Ensure the model name is correct and the provider supports it. Try a simpler mod
 
 ### Model timeout errors
 
-Increase the timeout in your provider configuration:
-
-```env
-AI_TEAM_PROVIDER_DEFAULT_TIMEOUT_SECONDS=120
-```
+Increase `timeout_seconds` in the provider profile JSON or recreate the provider with a higher timeout once the CLI exposes timeout editing.
 
 ### Provider not found
 

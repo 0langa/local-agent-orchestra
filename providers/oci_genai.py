@@ -5,6 +5,7 @@ from providers.base import ModelProvider, ModelRequest, ModelResponse
 
 class OCIGenAIProvider(ModelProvider):
     def invoke(self, request: ModelRequest) -> ModelResponse:
+        self.validate_request(request)
         from agentheim.vendor.aictx.llm.oci_genai import OCIGenAIProvider as _AictxOCI
         from agentheim.vendor.aictx.llm.base import ChatRequest
 

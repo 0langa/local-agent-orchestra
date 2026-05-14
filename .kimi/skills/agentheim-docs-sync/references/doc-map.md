@@ -45,7 +45,7 @@ Agentheim is a **preset-driven, local-first AI automation platform** with a gene
 
 ### Design Principles
 
-- **Core ignorance** — `core/` knows no provider, model, workflow, or tool names (one exception: `core/model_registry.py` contains `DEFAULT_PROVIDER_MAP` as a bootstrapping default; the `ModelRegistry` class itself remains fully generic)
+- **Core ignorance** — `core/` knows no provider, model, workflow, or tool names
 - **Local-first** — zero external services required; privacy modes enforced in code
 - **Safety by default** — destructive ops require approval; policies are code, not prompts
 - **Fully auditable** — every run produces an append-only event ledger
@@ -88,11 +88,6 @@ agentheim/
 │   ├── openai_v1.py           # OpenAI-compatible adapter
 │   ├── azure_foundry.py       # Azure AI Foundry adapter
 │   ├── aws_bedrock.py         # AWS Bedrock adapter
-│   ├── anthropic.py           # Anthropic Messages API adapter
-│   ├── gemini.py              # Gemini API and Vertex AI adapters
-│   ├── cohere.py              # Cohere adapter
-│   ├── perplexity.py          # Perplexity adapter
-│   ├── ollama_cloud.py        # Ollama cloud adapter
 │   └── oci_genai.py           # OCI GenAI adapter
 │
 ├── tools/                     # Mediated, policy-gated tool implementations
@@ -163,12 +158,6 @@ The core runtime (`core/`) is the heart of the system. It is intentionally **gen
 | **ToolRegistry** | `tool_protocol.py` | Mediates all tool invocations through the policy engine |
 | **ModelRegistry** | `model_registry.py` | Resolves capability-based model bindings |
 | **CapabilityRegistry** | `capability_registry.py` | Discovers and registers workflows, presets, and memory backends |
-
-### Provider Profiles
-
-AI provider setup is owned by `config/` and consumed by the generic model registry. Provider profiles store non-secret provider metadata, role/model bindings, capability tags, and secret refs. Raw provider secrets live in the OS keychain or encrypted vault; `.env` provider loading is not part of runtime config.
-
-`core/model_registry.py` stays generic. It receives resolved `AgentModelConfig` objects and lazy-loads provider adapters by descriptor.
 | **Event** | `events.py` | Structured event schema (20+ types) with UUID, sequence, hash |
 | **ArtifactStore** | `artifact_store.py` | Produces and validates 15+ run artifacts |
 | **ContextPacker** | `context_packer.py` | Prepares repository context for agent consumption |
@@ -244,9 +233,7 @@ The project is governed by **7 Immutable Laws** defined in the [Project Doctrine
 
 | # | Law | One-Line Rule |
 |---|-----|---------------|
-| 1 | **Core Ignorance** | `core/` knows NO provider, workflow, tool, or model names* |
-
-\* One intentional exception: `core/model_registry.py` holds `DEFAULT_PROVIDER_MAP` as a convenience default. The `ModelRegistry` class accepts any `provider_map` parameter and remains generic.
+| 1 | **Core Ignorance** | `core/` knows NO provider, workflow, tool, or model names |
 | 2 | **Pack Autonomy** | Workflow packs don't import providers or mutate core state |
 | 3 | **Provider Swap** | All providers are lazy-loaded, interchangeable adapters |
 | 4 | **Disclosure** | Beginner gets presets. Power-user gets config. Dev gets APIs. |
