@@ -43,7 +43,7 @@ All side effects go through maintained safety paths: tool protocol, policy engin
 - `docs/README.md` is the documentation index.
 - `docs/ARCHITECTURE.md` describes current architecture.
 - `docs/SAFETY.md` describes current safety behavior.
-- `docs/AICTX_INTEGRATION_PLAN.md` governs AICtx integration planning.
+- `docs/adr/ADR-001-aictx-integration-contract.md` and `agentheim/vendor/MODULE_MAP.md` govern AICtx integration boundaries and module ownership.
 - `.github/instructions/*.md` files are binding agent instructions.
 
 If a file referenced by an instruction no longer exists, report and fix the drift rather than following stale guidance.

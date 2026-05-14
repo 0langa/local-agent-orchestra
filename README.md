@@ -1,6 +1,6 @@
 # Agentheim
 
-[![Tests](https://img.shields.io/badge/tests-785%20passing-brightgreen)](https://github.com/0langa/agentheim/actions)
+[![Tests](https://img.shields.io/badge/tests-1133%20collected-blue)](https://github.com/0langa/agentheim/actions)
 [![Architecture](https://img.shields.io/badge/architecture-local_first-blue)](docs/ARCHITECTURE.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-unified-blue)](docs/README.md)
@@ -113,7 +113,7 @@ Core Runtime (Generic)    →  DAG execution, policy engine, ledger, model regis
 pytest tests\ -v
 ```
 
-**785 tests passing, 3 skipped in this validated environment.** The skipped tests are optional GUI-environment checks when desktop dependencies are unavailable.
+Current local collection: **1133 total tests collected**. The default `pytest -q` lane selects 1098 tests and deselects 35 slow/e2e/lint tests via configured markers.
 
 ---
 

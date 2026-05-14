@@ -100,6 +100,7 @@ class TestTools:
         data = response.json()
         assert data["success"] is True
         assert data["data"] == "world"
+        assert data["requires_approval"] is False
 
     def test_invoke_browser_blocked(self, client: TestClient) -> None:
         response = client.post(
@@ -108,6 +109,19 @@ class TestTools:
             headers={"X-API-Key": "test-key"},
         )
         assert response.status_code == 403
+
+    def test_invoke_filesystem_write_returns_approval_request(self, tmp_path: Path, client: TestClient) -> None:
+        response = client.post(
+            "/api/tools/filesystem/invoke",
+            json={"params": {"operation": "write", "path": "created.txt", "content": "new"}},
+            headers={"X-API-Key": "test-key"},
+        )
+        assert response.status_code == 409
+        data = response.json()
+        assert data["success"] is False
+        assert data["requires_approval"] is True
+        assert data["policy"]["decision"] == "ask"
+        assert not (tmp_path / "created.txt").exists()
 
 
 class TestWorkflows:

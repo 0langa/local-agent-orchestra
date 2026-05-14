@@ -89,8 +89,8 @@ Read `references/doc-map.md` for full mapping. Key rules:
 **`.github/instructions/` changes → `AGENTS.md`**
 - Update binding instructions list
 
-**AICtx changes → `docs/AICTX_INTEGRATION_PLAN.md` + `agentheim/vendor/MODULE_MAP.md`**
-- Update milestone status
+**AICtx changes → `docs/adr/ADR-001-aictx-integration-contract.md` + `agentheim/vendor/MODULE_MAP.md`**
+- Update integration contract or ownership notes
 - Update module mapping
 
 ### 3. Check for Stale References

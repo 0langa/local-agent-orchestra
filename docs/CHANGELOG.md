@@ -2,6 +2,16 @@
 
 ## 2026-05-14
 
+### Baseline Roadmap Phase 0 + Phase 1 Tool Slice
+- Renamed the active baseline blueprint to `BASELINE-ROADMAP.md` and marked Phase 0 complete with evidence links.
+- Added `docs/SUPPORT_MATRIX.md` for stable/beta/experimental/internal support states across providers, presets, interfaces, tools, and advanced subsystems.
+- Added `docs/TIER1_CONTRACTS.md` mapping baseline user journeys to CLI/API/Web/Desktop surfaces, output contracts, docs, and evidence.
+- Added `baseline` devtest mode covering instruction drift, CLI help, doctor skip-connectivity, provider templates, preset registry load, tool registry load, and pytest collection.
+- Added centralized `core.tool_invocation.ToolInvoker` for policy-gated tool calls, operation-level filesystem risk, approval-required responses, and ledger tool events.
+- Routed API and Web UI tool invocation endpoints through the centralized tool invocation service.
+- Added `tests/test_tool_invocation.py` and expanded API/Web tool tests for medium-risk approval responses.
+- Updated docs and live evidence records to current collection count: 1133 total tests collected, default lane selects 1098 and deselects 35.
+
 ### Resume + HTTP Tool + Adapter Tests (Verifier Blockers)
 - Fixed CLI `resume` to fallback to `run.json` when `RUN_INITIATED` event is missing or `workflow_id` is empty (`interfaces/cli/cli.py`)
 - Added `ledger.verify_chain()` integrity check in resume command (warning only, non-blocking)

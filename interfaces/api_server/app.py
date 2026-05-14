@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from config.config import (
@@ -32,12 +32,13 @@ from core.public_api import (
     RunRecord,
     RunStatus,
     ToolContext,
-    ToolResult,
+    ToolInvoker,
     build_model_registry,
+    interface_policy_config,
     list_workflows as cap_list_workflows,
 )
 from memory.bus import MemoryBus
-from tools.registry import ToolRegistry
+from tools.registry import ToolRegistry, create_core_tool_registry
 
 from interfaces.api_server.auth import verify_api_key
 from interfaces.api_server.rate_limit import RateLimiter
@@ -74,6 +75,8 @@ class ToolInvokeResponse(BaseModel):
     data: Any = None
     error: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    requires_approval: bool = False
+    policy: dict[str, Any] | None = None
 
 
 class WorkflowListItem(BaseModel):
@@ -283,6 +286,8 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     )
 
     tool_registry = ToolRegistry(repo_root)
+    core_tool_registry = create_core_tool_registry(repo_root)
+    tool_invoker = ToolInvoker(registry=core_tool_registry, policy_config=interface_policy_config())
     memory_bus = MemoryBus(repo_root)
     rate_limiter = RateLimiter(max_requests=60, window_seconds=60.0)
     run_executor = RunExecutor()
@@ -314,6 +319,19 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             if getattr(candidate, "tool_id", None) == tool_id:
                 return candidate
         return None
+
+    def _policy_to_dict(policy) -> dict[str, Any] | None:
+        if policy is None:
+            return None
+        return {
+            "decision": policy.decision,
+            "reason": policy.reason,
+            "policy_id": policy.policy_id,
+            "risk_level": policy.risk_level.value,
+            "suggested_approval": policy.suggested_approval,
+            "override_possible": policy.override_possible,
+            "metadata": policy.metadata,
+        }
 
     def _import_workflows() -> None:
         try:
@@ -450,20 +468,32 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         if tool is None:
             raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
 
-        # Safety: block high/critical risk tools without explicit confirmation
-        if tool.risk_level.value in ("high", "critical"):
+        ctx = ToolContext(network_allowed=False, workspace=repo_root, allowed_paths=[str(repo_root)])
+        result = tool_invoker.invoke(tool_id, request.params, ctx)
+        if result.requires_approval:
+            return JSONResponse(
+                status_code=409,
+                content=ToolInvokeResponse(
+                    success=False,
+                    error=result.error,
+                    metadata=result.metadata or {},
+                    requires_approval=True,
+                    policy=_policy_to_dict(result.policy),
+                ).model_dump(),
+            )
+        if result.policy and result.policy.decision == "deny":
             raise HTTPException(
                 status_code=403,
-                detail=f"Tool '{tool_id}' has risk level '{tool.risk_level.value}'. Use CLI for high-risk operations.",
+                detail=f"Tool '{tool_id}' blocked by policy. Use CLI for high-risk operations. {result.error}",
             )
 
-        ctx = ToolContext(network_allowed=False)
-        result: ToolResult = tool.invoke(request.params, ctx)
         return ToolInvokeResponse(
             success=result.success,
             data=result.data,
             error=result.error,
-            metadata=result.metadata,
+            metadata=result.metadata or {},
+            requires_approval=result.requires_approval,
+            policy=_policy_to_dict(result.policy),
         )
 
     @app.get("/api/workflows", response_model=list[WorkflowListItem], tags=["workflows"])

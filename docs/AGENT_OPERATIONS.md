@@ -12,6 +12,8 @@ Agentheim uses a layered directive system:
 - `skills/` contains task-specific operational helpers.
 - `docs/` contains human-readable project documentation.
 - `devtest/` contains local validation command references.
+- `docs/SUPPORT_MATRIX.md` records stable, beta, experimental, and internal support states.
+- `docs/TIER1_CONTRACTS.md` maps baseline user journeys to CLI/API/docs/tests.
 
 Agents must read `.github/instructions/README.md` and every binding instruction file before planning or editing.
 
@@ -51,6 +53,12 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode directi
 
 For runtime code changes, combine directive checks with focused pytest or devtest modes that match the risk surface.
 
+For roadmap-entry baseline checks, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode baseline -NoPrompt
+```
+
 `scripts/roadmap-check.py` and `phase7` devtest mode are legacy validation paths. Use them only for roadmap-era investigation or explicit user requests.
 
 ## Future MCP
@@ -61,4 +69,3 @@ MCP support should follow the same governance model:
 - MCP usage examples belong in docs.
 - MCP validation commands belong in `devtest/`.
 - MCP tools must still respect Agentheim policy, approval, privacy, redaction, and traceability rules.
-

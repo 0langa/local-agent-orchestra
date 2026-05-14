@@ -7,7 +7,6 @@ Run this checklist before finalizing substantial changes.
 - run `python scripts/check-agent-instructions.py`
 - confirm `.github/instructions/*.md` are non-empty
 - confirm canonical `02-forbidden-behaviors.md` exists
-- confirm `02-forbidden-behaviours.md` points to canonical `02-forbidden-behaviors.md`
 - confirm the main autonomous engineer agent references required instructions
 
 ## 2. Static Boundary Audit

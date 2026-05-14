@@ -10,6 +10,7 @@
 - [Full Suite](#full-suite)
 - [Targeted Subsets](#targeted-subsets)
 - [DevTest Runner](#devtest-runner)
+- [Baseline Smoke Gate](#baseline-smoke-gate)
 - [AI Connectivity Test](#ai-connectivity-test)
 - [CLI Smoke Tests](#cli-smoke-tests)
 - [Docs Smoke Tests](#docs-smoke-tests)
@@ -38,7 +39,7 @@ pytest -q
 pytest -q tests/
 ```
 
-Current status: **785 collected** (3 skipped) (skipped tests are optional GUI-environment checks when desktop dependencies are unavailable).
+Current collection status: **1133 total tests collected**. The default `pytest -q` lane selects 1098 tests and deselects 35 slow/e2e/lint tests via configured markers.
 
 ---
 
@@ -65,6 +66,9 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 # Directive — docs, GitHub instructions, and governance checks
 powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode directive -NoPrompt
 
+# Baseline — roadmap-entry smoke gate
+powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode baseline -NoPrompt
+
 # Legacy Phase 7 — roadmap-era production hardening gates
 powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode phase7 -NoPrompt
 
@@ -80,6 +84,16 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode full -K
 ```
 
 `phase7` is a legacy roadmap-era validation mode. Prefer `directive` plus `targeted` or `broad` for current directive-system work.
+
+---
+
+## Baseline Smoke Gate
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode baseline -NoPrompt
+```
+
+Use this before roadmap implementation batches. It checks instruction drift, repo-local CLI help, doctor without connectivity, provider template loading, preset registry loading, canonical tool registry loading, and pytest collection. It does not run live AI or execute the full test suite.
 
 ---
 
@@ -149,7 +163,7 @@ print('markdown links ok')
 '@ | python -
 ```
 
-Checks local Markdown links across root GitHub-facing docs, `docs/`, `Agent-Team/README.md`, and GitHub Markdown files.
+Checks local Markdown links across root GitHub-facing docs, `docs/`, and GitHub Markdown files.
 
 ---
 
@@ -168,7 +182,7 @@ Use these after editing root docs, `docs/`, `.github/agents/`, `.github/instruct
 
 ```powershell
 python -c "from pathlib import Path; files=sorted(Path('.github/instructions').glob('*.md')); assert files and all(f.read_text(encoding='utf-8').strip() for f in files); print('instruction files ok:', [f.name for f in files])"
-python -c "from pathlib import Path; p=Path('.github/agents/agentheim-autonomous-engineer.agent.md'); text=p.read_text(encoding='utf-8'); required=['00-instruction-priority.md','01-doctrine.md','02-forbidden-behaviors.md','03-traceability.md','04-AICtx-integration.md','05-documentation-integrity.md','06-tooling-and-verification.md']; missing=[item for item in required if item not in text]; assert not missing, missing; print('agent references ok')"
+python -c "from pathlib import Path; p=Path('.github/agents/agentheim-autonomous-engineer.agent.md'); text=p.read_text(encoding='utf-8'); required=['00-instruction-priority.md','01-doctrine.md','02-forbidden-behaviors.md','03-traceability.md','04-AICtx-integration.md','05-documentation-integrity.md','06-tooling-and-verification.md','07-chat-output.md']; missing=[item for item in required if item not in text]; assert not missing, missing; print('agent references ok')"
 ```
 
 Confirms binding `.github/instructions/*.md` files are present, non-empty, and referenced by the main autonomous engineer agent.

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("narrow", "targeted", "broad", "full", "directive", "phase7", "auto")]
+    [ValidateSet("narrow", "targeted", "broad", "full", "directive", "baseline", "phase7", "auto")]
     [string]$Mode = "auto",
     [string]$K = "",
     [switch]$NoPrompt
@@ -170,6 +170,15 @@ switch ($Mode) {
         Invoke-CommandCheck -Label "directive governance lint" -Command @("python", "scripts/check-agent-instructions.py")
         Invoke-CommandCheck -Label "repo-local cli help smoke" -Command @("python", "-m", "interfaces.cli.cli", "--help")
         Invoke-CommandCheck -Label "repo-local doctor smoke" -Command @("python", "-m", "interfaces.cli.cli", "doctor", "--skip-connectivity")
+    }
+    "baseline" {
+        Invoke-CommandCheck -Label "baseline governance lint" -Command @("python", "scripts/check-agent-instructions.py")
+        Invoke-CommandCheck -Label "baseline cli help smoke" -Command @("python", "-m", "interfaces.cli.cli", "--help")
+        Invoke-CommandCheck -Label "baseline doctor smoke" -Command @("python", "-m", "interfaces.cli.cli", "doctor", "--skip-connectivity")
+        Invoke-CommandCheck -Label "baseline provider template load" -Command @("python", "-m", "interfaces.cli.cli", "provider", "templates")
+        Invoke-CommandCheck -Label "baseline preset registry load" -Command @("python", "-c", "from presets import PRESET_REGISTRY; ids=[p.preset_id for p in PRESET_REGISTRY.list()]; assert ids; print('presets:', ','.join(ids))")
+        Invoke-CommandCheck -Label "baseline tool registry load" -Command @("python", "-c", "from tools.registry import ToolRegistry; tools=[t.tool_id for t in ToolRegistry('.').tool_objects()]; assert {'filesystem','git','shell.execute','browser','local_db','http.request','memory'} <= set(tools); print('tools:', ','.join(sorted(tools)))")
+        Invoke-CommandCheck -Label "baseline pytest collection" -Command @("pytest", "--collect-only", "-q")
     }
     "phase7" {
         Write-Host "WARNING: phase7 mode is legacy. Prefer -Mode directive plus targeted/broad tests for new directive-system work."

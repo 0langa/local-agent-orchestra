@@ -6,7 +6,9 @@ These rules govern all work involving the AICtx project and the planned integrat
 
 - Agentheim is the host platform.
 - AICtx is the repository-context subsystem being absorbed.
-- `docs/AICTX_INTEGRATION_PLAN.md` is the current milestone plan.
+- `docs/adr/ADR-001-aictx-integration-contract.md` is the integration contract.
+- `agentheim/vendor/MODULE_MAP.md` documents current AICtx module ownership and adaptation state.
+- `BASELINE-ROADMAP.md` carries future baseline hardening work.
 - AICtx is installed as an editable package from the workspace project at `../AICtx`.
 - When investigating AICtx internals, inspect the workspace project at `../AICtx/src/aictx/`.
 
@@ -62,7 +64,7 @@ If changing any of these contracts, include:
 
 For AICtx integration tasks:
 
-1. Read this file and `docs/AICTX_INTEGRATION_PLAN.md`.
+1. Read this file, `docs/adr/ADR-001-aictx-integration-contract.md`, and `agentheim/vendor/MODULE_MAP.md`.
 2. Inspect relevant AICtx source under `../AICtx/src/aictx/`.
 3. Map the AICtx concept to the Agentheim owner subsystem before editing.
 4. Build or adapt through a clear boundary, such as a future `ContextOps` service.

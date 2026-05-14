@@ -1,9 +1,9 @@
 ---
 name: agentheim-aictx-guide
 description: >
-  Guide AICtx integration work in Agentheim. Knows the milestone plan (M0-M9),
-  ContextOps boundary, vendor module map, and migration steps. Use when working
-  on agentheim/context_ops.py, agentheim/context_ops_impl.py, or docs/AICTX_INTEGRATION_PLAN.md.
+  Guide AICtx integration work in Agentheim. Knows the completed M0-M9
+  integration state, ContextOps boundary, vendor module map, and migration steps. Use when working
+  on agentheim/context_ops.py, agentheim/context_ops_impl.py, or AICtx integration docs.
   Auto-triggers when ContextOps or integration docs are modified.
 ---
 
@@ -17,9 +17,9 @@ Navigate the AICtx integration without duplicating work or breaching boundaries.
 - **M1 Source Import And Boundary**: COMPLETE
 - **M2 Local Context Domain Integration**: COMPLETE
 - **M2.5 ABC Expansion + Editable Install**: COMPLETE
-- **M3-M9**: PENDING
+- **M3-M9**: COMPLETE
 
-Read `docs/AICTX_INTEGRATION_PLAN.md` for full milestone details.
+Read `docs/adr/ADR-001-aictx-integration-contract.md` for the integration contract and `agentheim/vendor/MODULE_MAP.md` for current module ownership.
 
 ## Key Boundaries
 
@@ -79,13 +79,13 @@ AICtx `llm/base.py` vs Agentheim `providers/base.py`:
 | M1 | ✅ | Source imported, ContextOps defined |
 | M2 | ✅ | ContextOps implementation (7 methods) |
 | M2.5 | ✅ | ABC expanded with init, clean, run_pipeline, public_docs_update; editable install |
-| M3 | ⏳ | Workflow And Preset Exposure |
-| M4 | ⏳ | CLI integration (`agentheim ctx`) |
-| M5 | ⏳ | Workflow integration |
-| M6 | ⏳ | Transient state migration to .ai-team/ |
-| M7 | ⏳ | Provider adapter layer |
-| M8 | ⏳ | Public docs convergence |
-| M9 | ⏳ | Standalone CLI deprecation |
+| M3 | ✅ | Workflow And Preset Exposure |
+| M4 | ✅ | CLI integration (`agentheim ctx`) |
+| M5 | ✅ | Workflow integration |
+| M6 | ✅ | Transient state migration to `.ai-team/` |
+| M7 | ✅ | Provider adapter layer |
+| M8 | ✅ | Public docs convergence |
+| M9 | ✅ | Standalone CLI deprecation |
 
 ## Module Map
 
@@ -95,6 +95,5 @@ Documents preserved / adapted / replaced modules. Check before touching vendor c
 
 ## Test Locations
 
-- ContextOps tests: `tests/test_context_ops_impl.py` (18 passed)
-- Vendor tests: `agentheim/vendor/aictx/tests/` (101 passed)
-- Target location by M3: `tests/vendor/aictx/`
+- ContextOps tests: `tests/test_context_ops_impl.py`
+- Compatibility/path tests: `tests/test_context_ops_paths.py`, `tests/test_legacy_aictx_reader.py`, and `tests/cli/test_ctx_commands.py`

@@ -86,7 +86,18 @@ POST /api/tools/{tool_id}/invoke
 
 Body: tool parameters as JSON.
 
-**Safety:** the current API route invokes LOW and MEDIUM tools directly. HIGH and CRITICAL tools are rejected with `403` and must be run through a local interface such as the CLI.
+**Safety:** API tool calls route through the centralized tool invocation service. LOW/NONE operations may execute. MEDIUM operations return `409` with an approval-required payload and are not executed. HIGH and CRITICAL operations return `403`.
+
+Tool invocation responses include:
+
+| Field | Meaning |
+| --- | --- |
+| `success` | Whether the tool executed successfully |
+| `data` | Tool result data when execution occurred |
+| `error` | Error string or `approval_required` |
+| `metadata` | Tool or approval metadata |
+| `requires_approval` | `true` when policy returned `ask` |
+| `policy` | Redacted policy decision metadata |
 
 ### Workflows
 
@@ -430,3 +441,5 @@ results = runner.run(
 - [User Guide](USER_GUIDE.md) — CLI commands and preset usage
 - [Architecture](ARCHITECTURE.md) — core runtime and subsystem details
 - [Development & Testing](DEV_TESTING.md) — running tests
+- [Support Matrix](SUPPORT_MATRIX.md) — current support states
+- [Tier-1 Contracts](TIER1_CONTRACTS.md) — baseline journey contracts

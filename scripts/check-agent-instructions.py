@@ -19,6 +19,7 @@ REQUIRED_INSTRUCTIONS = [
     "04-AICtx-integration.md",
     "05-documentation-integrity.md",
     "06-tooling-and-verification.md",
+    "07-chat-output.md",
 ]
 
 

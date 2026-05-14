@@ -25,8 +25,9 @@ Before planning or editing, read and obey:
 - `.github/instructions/04-AICtx-integration.md`
 - `.github/instructions/05-documentation-integrity.md`
 - `.github/instructions/06-tooling-and-verification.md`
+- `.github/instructions/07-chat-output.md`
 
-The compatibility alias `.github/instructions/02-forbidden-behaviours.md` may exist for discoverability, but the US-spelling file is canonical.
+The US-spelling file `.github/instructions/02-forbidden-behaviors.md` is canonical.
 
 If any instruction conflicts with the user's request, stop before editing, cite the exact conflict, and ask for direction.
 
@@ -46,8 +47,9 @@ Use these as current project anchors:
 - `docs/ARCHITECTURE.md` for current system layout and boundaries
 - `docs/DEV_TESTING.md` and `devtest/all-test-commands.md` for verification commands
 - `docs/AGENT_OPERATIONS.md` for human-readable agent operating guidance
-- `docs/AICTX_INTEGRATION_PLAN.md` for planned AICtx integration milestones
-- `REPOSITORY_AUDIT_REPORT.md` for historical audit findings and risk context
+- `docs/adr/ADR-001-aictx-integration-contract.md` for the AICtx integration contract
+- `agentheim/vendor/MODULE_MAP.md` for current AICtx module ownership and adaptation state
+- `BASELINE-ROADMAP.md` for the active baseline roadmap
 - `.github/instructions/*.md` for binding project rules
 
 Do not rely on deleted or legacy docs if current docs have moved. If a referenced path is missing, update the reference or report the drift.

@@ -21,6 +21,8 @@
 |----------|-----------------|
 | [Architecture](ARCHITECTURE.md) | System design, module overview, runtime phases, boundary rules |
 | [API Reference](API_REFERENCE.md) | REST API endpoints, SDK usage, WebSocket streaming |
+| [Support Matrix](SUPPORT_MATRIX.md) | Stable, beta, experimental, and internal support states |
+| [Tier-1 Contracts](TIER1_CONTRACTS.md) | Baseline user journeys mapped to CLI/API/docs/tests |
 | [Contributing](CONTRIBUTING.md) | Setup, coding standards, PR workflow, and governance |
 | [Development & Testing](DEV_TESTING.md) | Test commands, smoke tests, devtest runner, CI |
 | [Agent Operations](AGENT_OPERATIONS.md) | How agents, instructions, skills, docs, and validation fit together |
@@ -49,6 +51,8 @@ docs/
 ├── USER_GUIDE.md          # Install, configure, use the CLI and presets
 ├── ARCHITECTURE.md        # System design, modules, boundaries
 ├── API_REFERENCE.md       # REST API endpoints and integration
+├── SUPPORT_MATRIX.md      # Current support-state promises
+├── TIER1_CONTRACTS.md     # Baseline journey contracts
 ├── CONTRIBUTING.md        # Developer setup and contribution workflow
 ├── AGENT_OPERATIONS.md    # Agent operating model and validation flow
 ├── SAFETY.md              # Security model, privacy, threat reporting

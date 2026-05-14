@@ -67,6 +67,10 @@ from core.tool_protocol import ToolContext as ToolContext
 from core.tool_protocol import ToolRegistry as ToolRegistry
 from core.tool_protocol import ToolResult as ToolResult
 from core.tool_protocol import ToolSchema as ToolSchema
+from core.tool_invocation import ToolInvocationResult as ToolInvocationResult
+from core.tool_invocation import ToolInvoker as ToolInvoker
+from core.tool_invocation import interface_policy_config as interface_policy_config
+from core.tool_invocation import resolve_operation_risk as resolve_operation_risk
 
 # ─── Model registry ─────────────────────────────────────────────────
 from core.cascading_router import CascadingRouter as CascadingRouter
@@ -251,6 +255,10 @@ __all__ = [
     "ToolRegistry",
     "ToolResult",
     "ToolSchema",
+    "ToolInvocationResult",
+    "ToolInvoker",
+    "interface_policy_config",
+    "resolve_operation_risk",
     # Models
     "CascadingRouter",
     "ModelBinding",

@@ -1,12 +1,14 @@
 # AICtx Integration Rules
 
-These rules govern all work involving the AICtx project and the planned integration of AICtx capabilities into Agentheim.
+These rules govern all work involving the AICtx project and integrated AICtx capabilities in Agentheim.
 
 ## Source Of Truth
 
 - Agentheim is the host platform.
 - AICtx is the repository-context subsystem being absorbed.
-- `docs/AICTX_INTEGRATION_PLAN.md` is the current milestone plan.
+- `docs/adr/ADR-001-aictx-integration-contract.md` is the integration contract.
+- `agentheim/vendor/MODULE_MAP.md` documents current AICtx module ownership and adaptation state.
+- `BASELINE-ROADMAP.md` carries future baseline hardening work.
 - AICtx is installed as an editable package from the workspace project at `../AICtx`.
 - When investigating AICtx internals, inspect the workspace project at `../AICtx/src/aictx/`.
 
@@ -35,7 +37,7 @@ AICtx remains authoritative, until adapted, for:
 
 - Do not put AICtx-specific implementation logic in `core/`.
 - Do not introduce a parallel provider registry, policy engine, approval path, or ledger system.
-- Do not make `.aictx/` the long-term Agentheim runtime store unless the integration plan is explicitly updated.
+- Do not make `.aictx/` the long-term Agentheim runtime store unless the integration contract is explicitly updated.
 - Do not treat generated context as arbitrary prose. Lockfiles, hashes, deterministic outputs, and public-doc impact reports are contract artifacts.
 - Do not rewrite public docs directly from model output without deterministic impact mapping and review-first behavior.
 - Do not send repository snapshots, context bundles, secrets, or source files to remote services before transfer preflight, secret checks, privacy policy, budget checks, and explicit user intent are satisfied.
@@ -62,7 +64,7 @@ If changing any of these contracts, include:
 
 For AICtx integration tasks:
 
-1. Read this file and `docs/AICTX_INTEGRATION_PLAN.md`.
+1. Read this file, `docs/adr/ADR-001-aictx-integration-contract.md`, and `agentheim/vendor/MODULE_MAP.md`.
 2. Inspect relevant AICtx source under `../AICtx/src/aictx/`.
 3. Map the AICtx concept to the Agentheim owner subsystem before editing.
 4. Build or adapt through a clear boundary, such as a future `ContextOps` service.

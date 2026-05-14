@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from config.config import list_provider_templates, load_profiles_document
@@ -15,12 +15,13 @@ from core.public_api import (
     RunRecord,
     RunStatus,
     ToolContext,
-    ToolResult,
+    ToolInvoker,
     build_model_registry,
+    interface_policy_config,
     list_workflows as cap_list_workflows,
 )
 from memory.bus import MemoryBus
-from tools.registry import ToolRegistry
+from tools.registry import ToolRegistry, create_core_tool_registry
 
 from agentheim.context_ops_impl import AictxContextOps
 from agentheim.vendor.aictx.config import AictxConfig
@@ -51,6 +52,8 @@ class ToolInvokeResponse(BaseModel):
     data: Any = None
     error: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    requires_approval: bool = False
+    policy: dict[str, Any] | None = None
 
 
 class WorkflowListItem(BaseModel):
@@ -164,6 +167,8 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     )
 
     tool_registry = ToolRegistry(repo_root)
+    core_tool_registry = create_core_tool_registry(repo_root)
+    tool_invoker = ToolInvoker(registry=core_tool_registry, policy_config=interface_policy_config())
     memory_bus = MemoryBus(repo_root)
     run_executor = RunExecutor()
     aictx_config = AictxConfig()
@@ -177,6 +182,19 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     # ------------------------------------------------------------------
     # Routes
     # ------------------------------------------------------------------
+
+    def _policy_to_dict(policy) -> dict[str, Any] | None:
+        if policy is None:
+            return None
+        return {
+            "decision": policy.decision,
+            "reason": policy.reason,
+            "policy_id": policy.policy_id,
+            "risk_level": policy.risk_level.value,
+            "suggested_approval": policy.suggested_approval,
+            "override_possible": policy.override_possible,
+            "metadata": policy.metadata,
+        }
 
     @app.get("/", response_class=HTMLResponse)
     def root() -> str:
@@ -214,20 +232,32 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         if tool is None:
             raise HTTPException(status_code=404, detail=f"Tool '{body.tool_id}' not found")
 
-        # Prototype safety: block high/critical risk tools via web UI
-        if tool.risk_level.value in ("high", "critical"):
+        ctx = ToolContext(network_allowed=False, workspace=repo_root, allowed_paths=[str(repo_root)])
+        result = tool_invoker.invoke(body.tool_id, body.params, ctx)
+        if result.requires_approval:
+            return JSONResponse(
+                status_code=409,
+                content=ToolInvokeResponse(
+                    success=False,
+                    error=result.error,
+                    metadata=result.metadata or {},
+                    requires_approval=True,
+                    policy=_policy_to_dict(result.policy),
+                ).model_dump(),
+            )
+        if result.policy and result.policy.decision == "deny":
             raise HTTPException(
                 status_code=403,
-                detail=f"Tool '{body.tool_id}' has risk level '{tool.risk_level.value}' and is blocked in web UI prototype",
+                detail=f"Tool '{body.tool_id}' blocked by policy: {result.error}",
             )
 
-        ctx = ToolContext(network_allowed=False)
-        result: ToolResult = tool.invoke(body.params, ctx)
         return ToolInvokeResponse(
             success=result.success,
             data=result.data,
             error=result.error,
-            metadata=result.metadata,
+            metadata=result.metadata or {},
+            requires_approval=result.requires_approval,
+            policy=_policy_to_dict(result.policy),
         )
 
     @app.get("/api/workflows", response_model=list[WorkflowListItem])

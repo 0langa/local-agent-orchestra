@@ -48,7 +48,7 @@ Use these `memory` MCP tools:
 2. Check key facts against live repo:
    - Test counts match? (read docs/DEV_TESTING.md or run pytest)
    - File paths still exist? (ls / grep)
-   - Milestone statuses current? (read docs/AICTX_INTEGRATION_PLAN.md)
+   - AICtx state current? (read `docs/adr/ADR-001-aictx-integration-contract.md`, `agentheim/vendor/MODULE_MAP.md`, and `BASELINE-ROADMAP.md`)
    - MCP config matches? (read ~/.kimi/mcp.json)
 3. Flag discrepancies → queue updates
 ```
