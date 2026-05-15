@@ -71,23 +71,23 @@ This sweep verified docs, governance, CLI smoke, test collection, and the live v
 
 ## Historical Live Evidence
 
-Last recorded live provider runs were on 2026-05-14 against Azure Foundry profile `azure-real`.
+> **Archive note:** These are dated historical results. Some entries are **superseded** by current evidence above. Do not treat this table as current truth.
 
-| Area | Historical status | Notes |
-|------|-------------------|-------|
-| Azure provider smoke | pass | `doctor`, `ping-models`, and role provider tests were previously recorded as passing |
-| Codebase assistant / coding run | pass with capable models | Historical runs passed with `gpt-5.4` and `gpt-4.1`; `gpt-4.1-mini` was insufficient for the division-by-zero coding task |
-| Command assistant | pass | Historical live command path generated Windows-compatible shell output |
-| Docs maintainer | partial/pass | Plan mode passed; apply mode still needs explicit live validation |
-| File organizer | pass | Historical live dry-run and apply paths moved files as expected |
-| Local document chat | pass | Historical live run answered with citation from local docs |
-| Context maintainer | pass for dry-run/patch planning | Fresh runs emitted reports and initiation events |
-| GitHub maintainer | pass | Historical live run summarized issues and drafted PR text |
-| Research report | mixed historical notes | Unit/deep path and at least one live CLI path were recorded as passing, but API/Web live paths still need a clean rerun before stable claim |
-| Resume/report | partial | Fresh command-assistant/context-maintainer ledgers were fixed; old ledgers without `RUN_INITIATED` may remain non-resumable |
-| API/Web UI | partial | TestClient and selected live server paths passed historically; full provider-backed Web UI matrix not complete |
-| Guided TUI | pass | Scripted stdin route to local-document-chat passed historically |
-| Desktop UI | not live tested | Import/availability is not the same as full desktop validation |
+| Area | Historical status | Current status | Notes |
+|------|-------------------|----------------|-------|
+| Azure provider smoke | pass | ✅ Still valid | Fresh evidence 2026-05-15 confirms pass |
+| Codebase assistant / coding run | pass with capable models | ⚠️ Superseded | Passes with `gpt-5.4` / `gpt-4.1`; fails with `gpt-5.4-mini` (2026-05-15) |
+| Command assistant | pass | ✅ Still valid | Fresh pass 2026-05-15 on azure-real / gpt-5.4-mini |
+| Docs maintainer | partial/pass | ⚠️ Superseded | Plan mode passes on azure-real; fails on Gemini due to rate limit (2026-05-15) |
+| File organizer | pass | ⚠️ Superseded | Dry-run passes on azure-real and Gemini (2026-05-15); apply path not re-tested |
+| Local document chat | pass | ❌ Contradicted | Historical pass with capable models; fails on azure-real / gpt-5.4-mini (2026-05-15) and Gemini |
+| Context maintainer | pass for dry-run/patch planning | ✅ Still valid | Fresh pass 2026-05-15 on both azure-real and Gemini |
+| GitHub maintainer | pass | ⚠️ Superseded | Fresh pass 2026-05-15 on azure-real; not tested on Gemini due to rate limit |
+| Research report | mixed historical notes | ❌ Contradicted | Historical CLI pass; fails on azure-real / gpt-5.4-mini (exit 1, 2026-05-15) and Gemini |
+| Resume/report | partial | ✅ Still valid | `command-assistant` report/resume pass 2026-05-15 on azure-real |
+| API/Web UI | partial | ⚠️ Unchanged | TestClient paths pass; full provider-backed Web UI matrix not complete |
+| Guided TUI | pass | ⚠️ Unchanged | Historical scripted stdin pass; not re-run in 2026-05-15 sweep |
+| Desktop UI | not live tested | ⚠️ Unchanged | Still not live tested |
 
 Historical model entries include `gpt-4.1`, `gpt-4.1-mini`, and `gpt-5.4`. Treat those as dated evidence, not current provider defaults.
 

@@ -2,6 +2,17 @@
 
 ## 2026-05-15
 
+### Phase 6 Slice — Archive Contradictory Historical Results
+- Added `Current status` column to Historical Live Evidence table in
+  `live-ai-testing.md` marking entries as ✅ Still valid, ⚠️ Superseded, or
+  ❌ Contradicted by fresh evidence.
+- Added archive-note banner at top of historical section warning readers not
+  to treat dated results as current truth.
+- Updated `BASELINE-ROADMAP.md` Phase 6 status to reflect archive completion.
+- Key contradictions flagged: `local-document-chat` (fails on mini/Gemini),
+  `codebase-assistant` (fails on mini), `research-report` (fails on mini).
+- Validation: baseline gate pass.
+
 ### Phase 6 Slice — Runner Delay Feature + Gemini Rate-Limit Retest
 - Added `--delay-between-tests` and `--delay-between-attempts` CLI args to
   `scripts/live_validate.py` for rate-limit mitigation.
