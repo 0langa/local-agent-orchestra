@@ -247,7 +247,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ## 🟡 Phase 2 - Provider Lanes
 
-**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) is stable for the Azure Foundry/OpenAI-compatible path: `azure-real` / `gpt-5.4` passes doctor, ping-models, planner/executor/verifier provider tests, text/JSON, vision, and `command-assistant`. Lane 2 is stable for Gemini API: a temporary Gemini API key / `gemini-2.5-flash` passes provider smoke, text/JSON, vision, and multiple presets without 429s; Vertex ADC remains beta/unproven. Lane 3 (self-hosted) has localhost mock-shim evidence across all 17 provider adapter types, but still lacks a real local endpoint run.
+**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) is stable for the Azure Foundry/OpenAI-compatible path: `azure-real` / `gpt-5.4` passes doctor, ping-models, planner/executor/verifier provider tests, text/JSON, vision, and `command-assistant`. Lane 2 is stable for Gemini API: a temporary Gemini API key / `gemini-2.5-flash` passes provider smoke, text/JSON, vision, and multiple presets without 429s; Vertex ADC remains beta/unproven. Lane 3 (self-hosted) now has a real local endpoint: `llama-local` / `qwen2.5-0.5b` via llama.cpp at `127.0.0.1:8080/v1` passes `provider test`. A 3B model could not load due to host RAM constraints (~500 MB free); the 0.5B model verifies the provider lane wiring. Mock-shim 17/17 provider adapter evidence remains as supplementary wiring proof.
 
 **Goal:** Make the top 3 provider lanes polished, documented, and empirically proven.
 
@@ -382,9 +382,9 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 #### Remaining Path
 
-1. Start one real local endpoint, preferably Ollama or LM Studio, with a model capable of structured JSON.
-2. Add/use a provider profile for that endpoint, then run `provider test` for planner/executor/verifier.
-3. Run a non-coding stable preset first (`command-assistant` or `local-document-chat`) before attempting coding.
+1. ~~Start one real local endpoint...~~ Done: llama.cpp server at `127.0.0.1:8080/v1` with `Qwen2.5-0.5B-Instruct` passes `provider test`.
+2. Upgrade to a 1B–3B model when host RAM is available (currently ~500 MB free; 3B Q4_K_M needs ~1.7 GB).
+3. Run a non-coding stable preset (`command-assistant` or `local-document-chat`) through the local endpoint.
 4. Keep the 17/17 mock-shim result as wiring evidence only, not model-quality evidence.
 
 ### 🟢 Cross-Provider Work
@@ -695,7 +695,7 @@ python -m interfaces.cli.cli copy --help
 
 ## 🟡 Phase 6 - Live Validation Program
 
-**Status:** Partial as of 2026-05-15. Runner foundation is complete: `scripts/live_validate.py` records structured evidence, provider/profile/model, artifacts, failure categories, bounded retries, safety-negative `expect_failure`, and delay controls. Lane 1 has an 18-check matrix on `azure-real` / `gpt-5.4-mini` plus focused `gpt-5.4` evidence: `local-document-chat` pass, `research-report` pass, `codebase-assistant` blocked. Lane 2 is blocked by Gemini free-tier 429s. Lane 3 has 17/17 localhost mock-shim provider wiring evidence plus an automated slow pytest, but still needs a real local endpoint. Contradictory historical results are archived.
+**Status:** Partial as of 2026-05-15. Runner foundation is complete: `scripts/live_validate.py` records structured evidence, provider/profile/model, artifacts, failure categories, bounded retries, safety-negative `expect_failure`, and delay controls. Lane 1 has an 18-check matrix on `azure-real` / `gpt-5.4-mini` plus focused `gpt-5.4` evidence: `local-document-chat` pass, `research-report` pass, `codebase-assistant` blocked. Lane 2 is blocked by Gemini free-tier 429s. Lane 3 has a real local endpoint (`llama-local` / `qwen2.5-0.5b` via llama.cpp) plus 17/17 mock-shim wiring evidence. Contradictory historical results are archived.
 
 **Goal:** Make live evidence repeatable, bounded, and safe.
 

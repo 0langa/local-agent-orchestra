@@ -8,6 +8,22 @@ Run live AI checks from repo root with the intended provider profile configured.
 
 ## Fresh Live Evidence
 
+### Self-Hosted Local Endpoint — llama.cpp — 2026-05-15
+
+Real local endpoint smoke using llama.cpp server in `.localtest/llama.cpp/`.
+
+| Profile | Provider/model | Result | Evidence |
+|---------|----------------|--------|----------|
+| `llama-local` | `openai_compatible` / `qwen2.5-0.5b` | pass | `provider test` planner role passes; chat completions API responds with valid JSON |
+
+**Setup:**
+- Binary: llama.cpp b9165 win-cpu-x64 from GitHub releases
+- Model: `Qwen2.5-0.5B-Instruct-Q4_K_M.gguf` (~380 MB)
+- Endpoint: `http://127.0.0.1:8080/v1`
+- Scripts: `start-server.ps1` / `stop-server.ps1` in `.localtest/llama.cpp/`
+
+**Note:** A 3B model could not load due to host RAM constraints (~500 MB free). The 0.5B model verifies provider lane wiring. Upgrade to 1B–3B when RAM is available.
+
 ### Provider Stability Sweep — Azure `gpt-5.4` and Gemini Key Test — 2026-05-15
 
 Goal: close provider-compatibility proof with bounded, low-quota live checks. This does **not** promote `codebase-assistant`; coding workflow stability remains tracked separately.
@@ -273,7 +289,7 @@ These need fresh evidence before claiming a polished baseline:
 |-----|--------------|
 | OpenAI-compatible lane | Azure Foundry compatibility stable on `azure-real` / `gpt-5.4`: provider smoke, text/JSON, vision, and `command-assistant` pass. `codebase-assistant` still blocks as workflow quality, not provider connectivity. |
 | Google lane | Gemini API compatibility stable on a temporary Gemini API key / `gemini-2.5-flash`: provider smoke, text/JSON, vision, and multiple presets pass. Vertex ADC still unproven and remains beta. |
-| Self-hosted lane | Run Ollama or LM Studio smoke against a real local endpoint, structured output failure handling, one local preset end to end |
+| Self-hosted lane | Real local endpoint added 2026-05-15: llama.cpp at `127.0.0.1:8080/v1` with `Qwen2.5-0.5B-Instruct` passes `provider test`; upgrade to 1B–3B when RAM available |
 | Research report | CLI live pass on `azure-real` / `gpt-5.4`; API + Web reruns still needed |
 | Resume/report | `command-assistant` report/resume pass 2026-05-15. Need same for `context-maintainer`, `local-document-chat`, `codebase-assistant`. |
 | Web UI | Provider-backed preset run matrix, status polling, and artifact rendering; shell/browser smoke already passes |
