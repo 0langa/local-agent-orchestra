@@ -930,12 +930,20 @@ If `ai_test.ps1` fails twice consecutively with 120-second timeouts, stop and re
 
 ## Immediate Next Sprint
 
-The next sprint should be small and high-leverage:
+Current state as of 2026-05-15:
 
-1. Fix instruction/doc drift and add support-state matrix.
-2. Replace `live-ai-testing.md` with current non-contradictory evidence.
-3. Add `context-maintainer` to preset smoke expectations.
-4. Create the Tier-1 contract matrix.
-5. Start the unified tool invocation service design and tests.
+- Phase 0 🟢, Phase 1 🟢, Phase 7 🟡 mostly done, Phase 8 🟡 partial.
+- Phase 2 🟡: Lane 1 (OpenAI-compatible/Azure) has 18-check live evidence; Lane 2 (Google) blocked by Gemini 429; Lane 3 (self-hosted) has mock-server provider smoke 17/17 pass + automated pytest test.
+- Phase 3 🟡: Canonical run summary and failed-run diagnostics bundle implemented.
+- Phase 4 🟡: Readiness checklists complete; 2/4 stable candidates pass on azure-real / gpt-5.4-mini; promotion to stable needs non-mini model rerun.
+- Phase 5 🟡: CLI/API frozen, parity tests pass, Web UI browser smoke done, Desktop server integration done.
+- Phase 6 🟡: Live validation runner mature with 18-check matrix, safety-negatives, delays, failure classification; Lane 1 evidence recorded; Lane 2/3 and vision gaps remain.
 
-Do not start new presets, providers, dashboards, marketplace features, federation features, or analytics until Phase 0 and Phase 1 gates pass.
+Next sprint priorities:
+
+1. **Phase 8 closure** — finish promotion criteria docs (ARCHITECTURE.md section added; verify SUPPORT_MATRIX.md has security model + known limits for all surfaces).
+2. **Phase 6 safety-negative expansion** — add `dirty-repo` and `patch-outside-allowed` negative-path tests to live runner or smoke suite.
+3. **Phase 4 stable promotion** — rerun `local-document-chat` and `codebase-assistant` with a non-mini capable model; document result.
+4. **Phase 5 Web UI e2e** — verify preset-run start → polling → completed/failed artifact flow with live AI via Playwright.
+
+Do not start new presets, providers, marketplace features, federation features, or analytics until Phase 9 gates are met.

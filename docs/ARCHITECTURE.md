@@ -301,6 +301,43 @@ Every directory has an implied subsystem owner. Cross-boundary changes must expl
 
 ---
 
+## Support States and Promotion Criteria
+
+Every exposed subsystem carries one support state. States are not cosmetic labels; they are architectural commitments about what the project promises and what evidence backs the promise.
+
+| State | Meaning | Promotion Gate |
+| --- | --- | --- |
+| Stable | Reliable default path; safe for first-run docs | Unit tests, smoke tests, docs, current validation evidence, troubleshooting coverage |
+| Beta | Intended for real use, known limits documented | Unit tests, smoke tests, docs, at least one live path, documented limits |
+| Experimental | Useful but not baseline-critical | Import/unit coverage, explicit limits, hidden from first-run path |
+| Internal | Implementation detail; not a user promise | Owner subsystem tests only |
+
+### Promotion Criteria Per Subsystem
+
+To advance a subsystem from one state to the next, the following must be present and current:
+
+1. **Owner** — which team or subsystem owns the surface (see Ownership Model above).
+2. **Entrypoints** — exact CLI commands, API routes, Web UI paths, or programmatic APIs a user touches.
+3. **Security model** — how auth, policy, approval, privacy, and redaction apply to this surface.
+4. **Docs** — user-facing docs in `docs/USER_GUIDE.md`, `docs/API_REFERENCE.md`, or `docs/TROUBLESHOOTING.md` that describe the surface and its limits.
+5. **Tests** — unit tests for logic, smoke tests for integration, and where applicable live tests against real providers.
+6. **Live evidence** — current, non-contradictory evidence that the surface works end-to-end with a real provider or endpoint.
+7. **Known limits** — documented gaps, failure modes, and unsupported paths.
+
+The canonical matrix lives in [`docs/SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md). This section exists to make the promotion path explicit in architecture terms, not to duplicate the matrix.
+
+### First-Run Path Protection
+
+Experimental surfaces must not appear in:
+- CLI `Getting Started` help panel
+- Web UI dashboard default views
+- API first-run documentation
+- `doctor` first-class lane checks
+
+They may remain available under `Advanced` panels, `--all` flags, or explicit opt-in routes.
+
+---
+
 ## See Also
 
 - [Project Doctrine](../.github/instructions/01-doctrine.md) — binding project laws
