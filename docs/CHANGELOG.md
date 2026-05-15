@@ -2,6 +2,11 @@
 
 ## 2026-05-15
 
+### Phase 7 Slice — Fix API Server Core Boundary Violation
+- Replaced direct `core.error_classification` import with `core.public_api` in `interfaces/api_server/app.py` `_ctx_exc()`.
+- Fixes `TestInterfaceIsolation::test_no_direct_core_imports[interfaces/api_server/app.py]` which was failing with `AssertionError: interfaces/api_server/app.py imports directly from core internals: [(432, 'core.error_classification')]`.
+- Validation: `tests/test_interface_isolation.py` 6 passed.
+
 ### Phase 4 Slice — Beta Candidate Workflow Readiness Checklists
 - Added "Workflow Readiness Checklists (Beta Candidates)" table to `docs/SUPPORT_MATRIX.md`.
 - Covers 9 checklist items per workflow for file-organizer, docs-maintainer, research-report, github-maintainer.

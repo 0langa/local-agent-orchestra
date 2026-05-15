@@ -429,7 +429,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         return AictxContextOps(cfg)
 
     def _ctx_exc(exc: Exception) -> None:
-        from core.error_classification import error_summary
+        from core.public_api import error_summary
 
         summary = error_summary(exc)
         if isinstance(exc, ValueError):
