@@ -2,6 +2,18 @@
 
 ## 2026-05-15
 
+### Phase 5 Slice — Web UI Browser Smoke: Root Load + Provider Health + Run Buttons
+- Enhanced `interfaces/web_ui/app.py` dashboard:
+  - Added "Active Runs" card with run status polling.
+  - Added "Run" buttons to each preset via event delegation (`data-preset-id`).
+  - Added `runPreset()`, `renderRuns()`, `pollRun()` JS functions for starting
+    runs and polling `/api/runs/{run_id}` every second.
+  - Active Runs card shows artifacts and errors when run completes/fails.
+- Verified with Playwright: root loads, "API connected" visible, all 4 provider
+  profiles listed, all 8 presets with Run buttons, 0 JS console errors.
+- Updated `live-ai-testing.md`, `BASELINE-ROADMAP.md` Phase 5 status.
+- Validation: `tests/test_web_ui.py` 22/22 pass; baseline gate pass.
+
 ### Phase 6 Slice — Archive Contradictory Historical Results
 - Added `Current status` column to Historical Live Evidence table in
   `live-ai-testing.md` marking entries as ✅ Still valid, ⚠️ Superseded, or

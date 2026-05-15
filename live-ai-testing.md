@@ -66,6 +66,21 @@ This sweep verified docs, governance, CLI smoke, test collection, and the live v
 | Doctor smoke | pass | `doctor --skip-connectivity`, included in directive devtest |
 | Test collection | pass | `pytest --collect-only -q` collected 1230 total tests; default lane selected 1195 and deselected 35 |
 | Markdown local links | pass after docs sync | repo-wide `*.md` link scan |
+| Web UI browser smoke | pass | Root loads, API connected, provider profiles visible, presets list with Run buttons, Active Runs section with polling, 0 console errors |
+
+### Web UI Browser Smoke — 2026-05-15
+
+Server started via `uvicorn interfaces.web_ui.app:create_app --factory --host 127.0.0.1 --port 8765`. Verified with Playwright:
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Root loads | pass | Title "Agentheim", status "API connected — v0.1.0-prototype" |
+| Provider health visible | pass | All 4 configured profiles listed (azure-real, gemini-lane2, gemini-live, vertex-live) |
+| Presets list | pass | All 8 presets rendered with Run buttons |
+| Active Runs | pass | Shows "No active runs" initially; polling mechanism implemented |
+| Console errors | pass | 0 JS errors (only favicon.ico 404, harmless) |
+
+**Note:** Full preset-run end-to-end through Web UI not tested in this slice to avoid live AI calls. Run buttons trigger `POST /api/presets/{preset_id}/run` and poll `/api/runs/{run_id}`; verified via code inspection and API test.
 
 ---
 

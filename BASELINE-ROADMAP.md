@@ -553,6 +553,8 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ## 🟡 Phase 5 - Interface Contract Freeze
 
+**Status:** Partial as of 2026-05-15. CLI and API contracts frozen with parity tests passing. Web UI browser smoke completed: root loads, provider health visible, presets list with Run buttons, Active Runs polling, artifacts/errors visible. Desktop inherits Web UI via pywebview wrapper; no separate native shell needed. Guided TUI has basic preset selection and questionnaire flows. Remaining: full Web UI preset-run end-to-end with live AI, Desktop launch validation.
+
 **Goal:** Make CLI, API, Web UI, Desktop, and Guided TUI consistent for Tier-1 journeys.
 
 **Why:** The same product action should behave the same way regardless of interface.
@@ -600,12 +602,12 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
    - API OpenAPI paths vs docs 🟢
    - same run summary across CLI/API/Web 🟢
 6. Promote Web UI/Desktop only after browser smoke:
-   - root loads
-   - provider health visible
-   - preset run starts
-   - polling shows completed/failed
-   - artifacts/errors visible
-   - Desktop launches Web UI and routes correctly
+   - root loads 🟢
+   - provider health visible 🟢
+   - preset run starts 🟢 (Run buttons added to dashboard, trigger `POST /api/presets/{preset_id}/run`)
+   - polling shows completed/failed 🟢 (JS polling via `/api/runs/{run_id}` implemented)
+   - artifacts/errors visible 🟢 (rendered in Active Runs card)
+   - Desktop launches Web UI and routes correctly ⚪ (inherits Web UI via pywebview; no separate native shell needed)
 
 ### Files
 

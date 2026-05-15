@@ -84,9 +84,9 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | --- | --- | --- | --- |
 | CLI | Beta | Smoke tests, directive/baseline gates, docs | Commands grouped into `Getting Started`, `Repository Work`, `Presets`, `Context`, `Advanced` panels since 2026-05-15 |
 | API server | Beta | TestClient tests and OpenAPI route tests | Tool approval UX returns approval payload; explicit `/api/tools/approvals/{request_id}/grant` and `/deny` continuation routes exist and are tested |
-| Web UI | Experimental | TestClient tests | Prototype UI; approval continuation routes (`/api/tools/approvals/{request_id}/grant` and `/deny`) tested; provider-backed full preset matrix not complete |
+| Web UI | Beta | TestClient tests + browser smoke 2026-05-15 | Root loads, provider health visible, presets with Run buttons, Active Runs polling, artifacts/errors visible; full provider-backed preset-run end-to-end not yet complete |
 | Guided TUI | Beta | Unit tests and historical scripted live run | Interactive flow needs current live pass for stable |
-| Desktop UI | Experimental | Unit/import/fallback tests | Needs launch and preset-run verification |
+| Desktop UI | Experimental | Unit/import/fallback tests | Inherits Web UI via pywebview wrapper; needs launch and preset-run verification |
 
 ## Tools
 

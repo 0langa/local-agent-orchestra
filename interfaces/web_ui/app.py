@@ -679,6 +679,13 @@ def _dashboard_html() -> str:
   .ctx-form button { background: #2563eb; border: none; color: #fff; padding: 0.4rem 0.75rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem; }
   .ctx-form button:hover { background: #1d4ed8; }
   .ctx-results { background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; margin-top: 1rem; min-height: 120px; font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto; color: #e2e8f0; }
+  .run-btn { background: #2563eb; border: none; color: #fff; padding: 0.2rem 0.5rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.75rem; margin-left: 0.5rem; }
+  .run-btn:hover { background: #1d4ed8; }
+  .run-status { font-size: 0.75rem; color: #94a3b8; margin-left: 0.5rem; }
+  .run-completed { color: #34d399; }
+  .run-failed { color: #f87171; }
+  .run-artifacts { margin-top: 0.35rem; font-size: 0.75rem; }
+  .run-error { margin-top: 0.35rem; font-size: 0.75rem; color: #f87171; }
 </style>
 </head>
 <body>
@@ -701,6 +708,10 @@ def _dashboard_html() -> str:
   <div class="card">
     <h2>Provider Center</h2>
     <ul id="providers-list"><li class="loading">Loading...</li></ul>
+  </div>
+  <div class="card">
+    <h2>Active Runs</h2>
+    <ul id="runs-list"><li class="loading">Loading...</li></ul>
   </div>
 </div>
 <div class="ctx-section">
@@ -770,6 +781,7 @@ async function loadAll() {
     return;
   }
   status.textContent = 'API connected &mdash; v' + health.version;
+  renderRuns();
 
   const toolsList = document.getElementById('tools-list');
   if (tools.error) { toolsList.innerHTML = '<li class="error">' + tools.error + '</li>'; }
@@ -781,7 +793,8 @@ async function loadAll() {
 
   const presetList = document.getElementById('presets-list');
   if (presets.error) { presetList.innerHTML = '<li class="error">' + presets.error + '</li>'; }
-  else { presetList.innerHTML = presets.map(p => '<li>' + p.preset_id + '</li>').join(''); }
+  else { presetList.innerHTML = presets.map(p => '<li>' + p.preset_id + ' <button class="run-btn" data-preset-id="' + p.preset_id + '">Run</button></li>').join('');
+    presetList.addEventListener('click', function(e) { if (e.target.classList.contains('run-btn')) { runPreset(e.target.dataset.presetId); } }); }
 
   const providerList = document.getElementById('providers-list');
   if (providers.error) { providerList.innerHTML = '<li class="error">' + providers.error + '</li>'; }
@@ -834,6 +847,51 @@ async function ctxDocs(action) {
     body: JSON.stringify(body)
   });
   results.textContent = data.error ? 'Error: ' + data.error : JSON.stringify(data, null, 2);
+}
+const activeRuns = new Map();
+async function runPreset(preset_id) {
+  const runsList = document.getElementById('runs-list');
+  runsList.innerHTML = '<li>Starting ' + preset_id + '...</li>';
+  const data = await fetchJSON('/api/presets/' + preset_id + '/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inputs: {} })
+  });
+  if (data.error) {
+    runsList.innerHTML = '<li class="error">Failed to start ' + preset_id + ': ' + data.error + '</li>';
+    return;
+  }
+  const run_id = data.run_id;
+  activeRuns.set(run_id, { preset_id, status: 'pending' });
+  renderRuns();
+  pollRun(run_id);
+}
+function renderRuns() {
+  const runsList = document.getElementById('runs-list');
+  if (activeRuns.size === 0) { runsList.innerHTML = '<li class="loading">No active runs</li>'; return; }
+  runsList.innerHTML = Array.from(activeRuns.entries()).map(([run_id, info]) => {
+    let statusClass = 'run-status';
+    if (info.status === 'completed') statusClass += ' run-completed';
+    if (info.status === 'failed') statusClass += ' run-failed';
+    let details = '';
+    if (info.artifacts && info.artifacts.length) {
+      details += '<div class="run-artifacts">Artifacts: ' + info.artifacts.map(a => '<span class="badge">' + a + '</span>').join(' ') + '</div>';
+    }
+    if (info.error) {
+      details += '<div class="run-error">' + info.error + '</div>';
+    }
+    return '<li>' + info.preset_id + ' <span class="' + statusClass + '">' + info.status + '</span> <code>' + run_id + '</code>' + details + '</li>';
+  }).join('');
+}
+async function pollRun(run_id) {
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const data = await fetchJSON('/api/runs/' + run_id);
+    if (data.error) { activeRuns.set(run_id, { ...activeRuns.get(run_id), status: 'error: ' + data.error }); renderRuns(); break; }
+    activeRuns.set(run_id, { ...activeRuns.get(run_id), status: data.status, artifacts: data.artifacts || [], error: data.error_summary || data.error || null });
+    renderRuns();
+    if (['completed', 'failed', 'cancelled'].includes(data.status)) { break; }
+  }
 }
 loadAll();
 </script>
