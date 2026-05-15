@@ -236,7 +236,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ## 🟡 Phase 2 - Provider Lanes
 
-**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) now has full 18-check structured live evidence via `scripts/live_validate.py` against `azure-real` profile: provider smoke (5/5 pass), stable presets (2/4 pass), beta presets (3/4 pass), report/resume followups (2/2 pass), safety negatives (3/3 pass). Lane 2 (Google) has fresh Gemini API-key path evidence from 2026-05-14 and full matrix attempted 2026-05-15 against `gemini-lane2` — executor/verifier pass, but aggressive 429 rate limits from `gemini-2.5-flash` block reliable full-matrix validation. Lane 3 (self-hosted) remains partially proven via localhost compatibility shim only.
+**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) now has full 18-check structured live evidence via `scripts/live_validate.py` against `azure-real` profile: provider smoke (5/5 pass), stable presets (2/4 pass), beta presets (3/4 pass), report/resume followups (2/2 pass), safety negatives (3/3 pass). Lane 2 (Google) has fresh Gemini API-key path evidence from 2026-05-14 and full matrix attempted 2026-05-15 against `gemini-lane2` — executor/verifier pass, but aggressive 429 rate limits from `gemini-2.5-flash` block reliable full-matrix validation. Lane 3 (self-hosted) now has expanded localhost compatibility shim evidence: mock server in fake mode validates all 17 provider adapter types through localhost-shaped configs (2026-05-15).
 
 **Goal:** Make the top 3 provider lanes polished, documented, and empirically proven.
 
@@ -326,7 +326,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 **Decision:** Self-hosted support is first-class through OpenAI-compatible endpoints first. Do not build a separate local-model provider zoo until this path is reliable.
 
-**Status note (2026-05-14):** Localhost compatibility path is now partially proven via `.localtest/mock-ai-server/`, including a localhost Azure/OpenAI-compatible proxy shim and generated local profiles. This validates localhost endpoint wiring, profile/role binding, and request/response flow through self-hosted-shaped configurations, but it does **not** yet replace fresh evidence from a real Ollama, LM Studio, vLLM, TGI, or llama.cpp server.
+**Status note (2026-05-15):** Localhost compatibility path expanded: mock server in fake mode now validates all 17 provider adapter types (anthropic, azure_foundry, cohere, openai_compatible, deepseek, gemini, groq, kimi_moonshot, lm_studio, mistral, ollama, ollama_cloud, openai_v1, openrouter, perplexity, together, xai_grok) through localhost-shaped configs. This proves endpoint wiring, profile generation, role binding, and request/response handling across the full provider registry, but it does **not** yet replace fresh evidence from a real Ollama, LM Studio, vLLM, TGI, or llama.cpp server.
 
 #### Work
 
@@ -348,7 +348,8 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
    - 🟢 service running
    - 🟢 endpoint reachable
    - 🟢 planner/executor/verifier roles bound
-   - ⚪ stable preset outcome
+   - 🟢 all 17 provider adapter types pass provider test against localhost mock
+   - ⚪ stable preset outcome with real local model
 
 #### Gates
 

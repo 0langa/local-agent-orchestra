@@ -206,18 +206,22 @@ Other integrated providers should remain loadable and theoretically functional, 
 
 ### Self-Hosted Localhost Compatibility Shim Evidence
 
-Recorded on 2026-05-14 using the gitignored local helper under `.localtest/mock-ai-server/`.
+Recorded on 2026-05-15 using the gitignored local helper under `.localtest/mock-ai-server/`.
 
 | Check | Result | Evidence |
 |-------|--------|----------|
-| Localhost Azure/OpenAI-compatible proxy startup | pass | `powershell -ExecutionPolicy Bypass -File .\.localtest\mock-ai-server\start-gpt54-mini-azure.ps1 -Fake` |
+| Localhost mock server startup (fake mode) | pass | `MOCK_ALLOW_FAKE=1 python .localtest/mock-ai-server/server.py` |
 | Generated local profile set | pass | `.localtest/mock-ai-server/make_agentheim_profiles.py` emitted 18 local mock profiles |
-| Localhost provider smoke through Agentheim provider configs | pass | `python .\.localtest\mock-ai-server\smoke_agentheim_http_providers.py` |
+| Localhost provider smoke through Agentheim provider configs | pass | `python .localtest/mock-ai-server/smoke_agentheim_http_providers.py` — 17/17 mock profiles passed |
+
+Detailed results (all 17 providers ok):
+
+- mock-anthropic, mock-azure, mock-cohere, mock-compatible, mock-deepseek, mock-gemini, mock-groq, mock-kimi, mock-lmstudio, mock-mistral, mock-ollama, mock-ollama_cloud, mock-openai, mock-openrouter, mock-perplexity, mock-together, mock-xai
 
 Interpretation:
 
 - This is valid evidence that self-hosted-shaped localhost configuration paths work through Agentheim.
-- This proves endpoint wiring, profile generation, role binding, and request/response handling against a localhost endpoint.
+- This proves endpoint wiring, profile generation, role binding, and request/response handling against a localhost endpoint across all 17 supported provider adapter types.
 - This does **not** prove real OSS model quality or actual local-server quirks for Ollama, LM Studio, vLLM, TGI, or llama.cpp.
 - Keep the self-hosted lane as partial until at least one real local endpoint is rerun end-to-end.
 

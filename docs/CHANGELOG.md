@@ -2,6 +2,18 @@
 
 ## 2026-05-15
 
+### Phase 2/6 Slice — Self-Hosted Lane Mock-Server Provider Smoke (17/17 pass)
+- Ran `.localtest/mock-ai-server/server.py` in `MOCK_ALLOW_FAKE=1` mode against
+  all 17 generated local provider profiles.
+- `smoke_agentheim_http_providers.py` result: 17/17 pass (anthropic, azure,
+  cohere, compatible, deepseek, gemini, groq, kimi, lmstudio, mistral, ollama,
+  ollama_cloud, openai, openrouter, perplexity, together, xai).
+- This expands Lane 3 (self-hosted) evidence from partial shim to full provider
+  registry coverage through localhost-shaped configurations.
+- Updated `live-ai-testing.md`, `BASELINE-ROADMAP.md` Phase 2/Lane 3,
+  `docs/SUPPORT_MATRIX.md`.
+- Validation: server health ok, all provider tests return non-empty responses.
+
 ### Phase 5 Slice — Desktop UI Server Integration Test
 - Added `TestDesktopUIServerIntegration` to `tests/test_desktop_ui.py`:
   - `test_server_starts_and_health_responds`: starts `_run_server` in a daemon
