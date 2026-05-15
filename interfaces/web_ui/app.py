@@ -105,6 +105,7 @@ class ProviderTemplateItem(BaseModel):
     provider_type: str
     capabilities: list[str] = Field(default_factory=list)
     docs_url: str
+    support_state: str = "unknown"
 
 
 class MemoryReadResponse(BaseModel):
@@ -390,7 +391,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
     @app.get("/api/providers/templates", response_model=list[ProviderTemplateItem])
     def provider_templates() -> list[ProviderTemplateItem]:
-        return [ProviderTemplateItem(**item) for item in list_provider_templates()]
+        return [ProviderTemplateItem(**item) for item in list_provider_templates(include_experimental=False)]
 
     @app.get("/api/providers/profiles")
     def provider_profiles() -> dict[str, Any]:
@@ -672,6 +673,13 @@ def _dashboard_html() -> str:
   .risk-low { color: #34d399; }
   .risk-none { color: #94a3b8; }
   .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 0.25rem; background: #334155; margin-left: 0.5rem; }
+  .state-stable { background: #064e3b; color: #34d399; }
+  .state-stable_candidate { background: #064e3b; color: #34d399; }
+  .state-beta { background: #713f12; color: #fbbf24; }
+  .state-experimental { background: #4c0519; color: #f87171; }
+  .state-unknown { background: #334155; color: #94a3b8; }
+  .legend { margin-top: 1.5rem; font-size: 0.8rem; color: #94a3b8; }
+  .legend .badge { margin-right: 0.5rem; margin-left: 0; }
   #status { margin-bottom: 1.5rem; font-size: 0.85rem; color: #34d399; }
   .loading { color: #94a3b8; }
   .error { color: #f87171; }
@@ -717,6 +725,11 @@ def _dashboard_html() -> str:
     <h2>Active Runs</h2>
     <ul id="runs-list"><li class="loading">Loading...</li></ul>
   </div>
+</div>
+<div class="legend">
+  <span class="badge state-stable">stable</span> default path
+  <span class="badge state-beta">beta</span> real use, known limits
+  <span class="badge state-experimental">experimental</span> not baseline-critical
 </div>
 <div class="ctx-section">
   <h2>Context Operations</h2>

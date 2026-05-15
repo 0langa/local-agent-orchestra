@@ -73,3 +73,21 @@ class TestApiServerNoExperimentalRoutes:
                 assert token not in path, (
                     f"API route '{path}' contains experimental token '{token}'"
                 )
+
+
+class TestProviderTemplatesNoExperimentalInFirstRun:
+    def test_cli_templates_excludes_experimental_by_default(self) -> None:
+        from config.config import list_provider_templates
+
+        templates = list_provider_templates()
+        for t in templates:
+            assert t["support_state"] != "experimental", (
+                f"experimental template '{t['kind']}' in default list_provider_templates()"
+            )
+
+    def test_all_templates_have_support_state(self) -> None:
+        from config.config import list_provider_templates
+
+        templates = list_provider_templates(include_experimental=True)
+        for t in templates:
+            assert "support_state" in t, f"template '{t['kind']}' missing support_state"

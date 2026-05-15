@@ -174,6 +174,21 @@ class TestListProviderTemplates:
             assert template["kind"]
             assert template["display_name"]
 
+    def test_excludes_experimental_by_default(self) -> None:
+        templates = list_provider_templates()
+        states = {t["support_state"] for t in templates}
+        assert "experimental" not in states, f"experimental templates leaked: {[t['kind'] for t in templates if t['support_state'] == 'experimental']}"
+
+    def test_includes_experimental_when_requested(self) -> None:
+        templates = list_provider_templates(include_experimental=True)
+        states = {t["support_state"] for t in templates}
+        assert "experimental" in states, "expected experimental templates when include_experimental=True"
+
+    def test_all_templates_have_support_state(self) -> None:
+        for template in list_provider_templates(include_experimental=True):
+            assert "support_state" in template, f"template '{template['kind']}' missing support_state"
+            assert template["support_state"] in {"stable", "beta", "stable_candidate", "experimental", "unknown"}
+
 
 class TestProviderAccountFromTemplate:
     """Tests for ``provider_account_from_template``."""

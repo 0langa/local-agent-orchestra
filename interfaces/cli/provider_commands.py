@@ -57,14 +57,15 @@ def _read_secret(value: str | None, auth_mode: str) -> str | None:
 
 
 @provider_app.command("templates")
-def templates() -> None:
-    table = Table(title="Provider Templates")
+def templates(all: bool = typer.Option(False, "--all", help="Include experimental provider templates.")) -> None:
+    title = "Provider Templates" + (" (including experimental)" if all else "")
+    table = Table(title=title)
     table.add_column("template")
     table.add_column("provider_type")
     table.add_column("auth")
     table.add_column("endpoint")
     table.add_column("capabilities")
-    for item in list_provider_templates():
+    for item in list_provider_templates(include_experimental=all):
         table.add_row(item["kind"], item["provider_type"], item["auth_mode"], item["endpoint"], ", ".join(item["capabilities"]))
     console.print(table)
 

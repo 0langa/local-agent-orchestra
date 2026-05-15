@@ -251,6 +251,16 @@ class TestProviders:
         provider_ids = {p["provider_id"] for p in data}
         assert "openai_v1" in provider_ids
 
+    def test_provider_templates_excludes_experimental(self, client: TestClient) -> None:
+        response = client.get("/api/providers/templates")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        for t in data:
+            assert t["support_state"] != "experimental", (
+                f"experimental template '{t['kind']}' leaked to API"
+            )
+
 
 class TestRuns:
     def test_run_not_found(self, client: TestClient) -> None:

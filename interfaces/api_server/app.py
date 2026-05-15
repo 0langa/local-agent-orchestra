@@ -167,6 +167,7 @@ class ProviderTemplateItem(BaseModel):
     provider_type: str
     capabilities: list[str] = Field(default_factory=list)
     docs_url: str
+    support_state: str = "unknown"
 
 
 class ProviderAddRequest(BaseModel):
@@ -736,7 +737,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
 
     @app.get("/api/providers/templates", response_model=list[ProviderTemplateItem], tags=["providers"])
     def provider_templates() -> list[ProviderTemplateItem]:
-        return [ProviderTemplateItem(**item) for item in list_provider_templates()]
+        return [ProviderTemplateItem(**item) for item in list_provider_templates(include_experimental=False)]
 
     @app.post("/api/providers", response_model=ProviderMutationResponse, tags=["providers"], dependencies=[Depends(rate_limiter.check)])
     def add_provider(request: ProviderAddRequest, api_key: str = Depends(verify_api_key)) -> ProviderMutationResponse:

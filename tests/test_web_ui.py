@@ -226,6 +226,18 @@ class TestPresets:
             assert p["support_state"] in ("stable_candidate", "beta", "experimental", "unknown")
 
 
+class TestProviderTemplates:
+    def test_templates_exclude_experimental(self, client: TestClient) -> None:
+        response = client.get("/api/providers/templates")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        for t in data:
+            assert t["support_state"] != "experimental", (
+                f"experimental template '{t['kind']}' leaked to Web UI"
+            )
+
+
 class TestRunWebSocket:
     def test_websocket_run_not_found(self, client: TestClient) -> None:
         from starlette.websockets import WebSocketDisconnect
