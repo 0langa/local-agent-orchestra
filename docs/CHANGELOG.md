@@ -2,6 +2,15 @@
 
 ## 2026-05-15
 
+### Phase 2 Slice — Azure Foundry Live Lane Evidence
+- Ran `scripts/live_validate.py --profile azure-real --only doctor,ping-models,provider-planner,provider-executor,provider-verifier,command-assistant`.
+- All 6 checks passed against `azure-real` profile (`azure_foundry` provider, `gpt-5.4-mini` model).
+- Updated `live-ai-testing.md` with structured fresh evidence table.
+- Updated `docs/SUPPORT_MATRIX.md` OpenAI-compatible lane and `azure_foundry` adapter rows.
+- Updated `BASELINE-ROADMAP.md` Phase 2 status to reflect Lane 1 fresh evidence.
+- Runner fix: `--profile` now temporarily switches the active project provider profile via `.ai-team/provider-profile.json` and restores it after the run, so evidence accurately reflects the tested profile.
+- Validation: runner exit code 0, 6/6 passed.
+
 ### Phase 6 Slice — Live Validation Program Foundation
 - Created `scripts/live_validate.py`: repeatable bounded live validation runner with built-in matrix.
 - Records per-test: command, provider/profile, model, repo path, run ID, result, artifact path, timestamp, failure category.

@@ -6,11 +6,28 @@ Run live AI checks from repo root with the intended provider profile configured.
 
 ---
 
+## Fresh Live Evidence
+
+### Azure Foundry Lane — 2026-05-15
+
+Profile `azure-real` (provider_type `azure_foundry`, model `gpt-5.4-mini`) via `scripts/live_validate.py`:
+
+| Check | Result | Duration | Evidence |
+|-------|--------|----------|----------|
+| doctor | pass | 4.3s | All checks passed |
+| ping-models | pass | 18.9s | All roles responded ok |
+| provider-planner | pass | 3.7s | `"ok": true` |
+| provider-executor | pass | 4.0s | `"ok": true` |
+| provider-verifier | pass | 3.6s | `"ok": true` |
+| command-assistant | pass | 7.0s | `status='done'`; run_id `20260515-181130-command-assistant-run` |
+
+**Interpretation:** OpenAI-compatible/Azure lane now has current structured live evidence for provider smoke, role connectivity, and one stable preset end-to-end. Lane gate partially satisfied; additional stable preset runs (local-document-chat, codebase-assistant, context-maintainer) would strengthen the claim before `stable` promotion.
+
 ## Current Drift Sweep
 
 **Sweep date:** 2026-05-15
 
-This sweep did not rerun live AI workflows. It verified docs, governance, CLI smoke, and test collection only.
+This sweep verified docs, governance, CLI smoke, test collection, and the live validation runner mechanics. The Azure live gate was rerun above.
 
 | Check | Result | Evidence |
 |-------|--------|----------|

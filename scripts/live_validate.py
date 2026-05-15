@@ -481,6 +481,33 @@ def write_summary_md(path: Path, payload: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _switch_profile(repo_root: str, profile: str | None) -> tuple[bool, str | None]:
+    """Temporarily switch active provider profile for the project. Returns (switched, original_profile)."""
+    if not profile:
+        return False, None
+    pointer_path = Path(repo_root) / ".ai-team" / "provider-profile.json"
+    original: str | None = None
+    if pointer_path.exists():
+        try:
+            original = json.loads(pointer_path.read_text(encoding="utf-8")).get("profile")
+        except Exception:
+            pass
+    if original == profile:
+        return False, original
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    pointer_path.write_text(json.dumps({"profile": profile}, indent=2) + "\n", encoding="utf-8")
+    return True, original
+
+
+def _restore_profile(repo_root: str, original: str | None) -> None:
+    pointer_path = Path(repo_root) / ".ai-team" / "provider-profile.json"
+    if original is None:
+        if pointer_path.exists():
+            pointer_path.unlink()
+    else:
+        pointer_path.write_text(json.dumps({"profile": original}, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     args = parse_args()
     matrix_path = Path(args.matrix) if args.matrix else None
@@ -515,8 +542,9 @@ def main() -> int:
     results_by_id: dict[str, TestResult] = {}
 
     provider_info = detect_provider_info()
+    switched, original_profile = _switch_profile(repo_root, args.profile)
     if args.profile:
-        provider_info["profile"] = args.profile
+        provider_info = detect_provider_info()
 
     print(f"Run dir: {run_dir}")
     print(f"Profile: {provider_info['profile']} | Provider: {provider_info['provider_type']} | Model: {provider_info['model']}")
@@ -525,72 +553,73 @@ def main() -> int:
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
 
-    for index, test in enumerate(selected, start=1):
-        test_id = str(test["id"])
-        description = str(test.get("description", ""))
-        print(f"[{index}/{len(selected)}] {test_id} :: {description}")
+    try:
+        for index, test in enumerate(selected, start=1):
+            test_id = str(test["id"])
+            description = str(test.get("description", ""))
+            print(f"[{index}/{len(selected)}] {test_id} :: {description}")
 
-        stdout_path = run_dir / f"{index:02d}-{test_id}.stdout.log"
-        stderr_path = run_dir / f"{index:02d}-{test_id}.stderr.log"
+            stdout_path = run_dir / f"{index:02d}-{test_id}.stdout.log"
+            stderr_path = run_dir / f"{index:02d}-{test_id}.stderr.log"
 
-        requires_run_id_from = test.get("requires_run_id_from")
-        if requires_run_id_from:
-            source = results_by_id.get(str(requires_run_id_from))
-            if not source or not source.run_id:
-                result = TestResult(
-                    test_id=test_id,
-                    description=description,
-                    status="skipped",
-                    exit_code=None,
-                    duration_seconds=0.0,
-                    run_id=None,
-                    missing_patterns=[],
-                    error=f"missing run_id from '{requires_run_id_from}'",
-                    stdout_path=str(stdout_path),
-                    stderr_path=str(stderr_path),
-                    tags=[str(tag) for tag in test.get("tags", [])],
-                    failure_category="skipped",
-                    provider_profile=provider_info["profile"],
-                    provider_type=provider_info["provider_type"],
-                    model=provider_info["model"],
-                    repo_path=repo_root,
-                    artifact_path=str(run_dir),
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+            requires_run_id_from = test.get("requires_run_id_from")
+            if requires_run_id_from:
+                source = results_by_id.get(str(requires_run_id_from))
+                if not source or not source.run_id:
+                    result = TestResult(
+                        test_id=test_id,
+                        description=description,
+                        status="skipped",
+                        exit_code=None,
+                        duration_seconds=0.0,
+                        run_id=None,
+                        missing_patterns=[],
+                        error=f"missing run_id from '{requires_run_id_from}'",
+                        stdout_path=str(stdout_path),
+                        stderr_path=str(stderr_path),
+                        tags=[str(tag) for tag in test.get("tags", [])],
+                        failure_category="skipped",
+                        provider_profile=provider_info["profile"],
+                        provider_type=provider_info["provider_type"],
+                        model=provider_info["model"],
+                        repo_path=repo_root,
+                        artifact_path=str(run_dir),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    )
+                    results.append(result)
+                    results_by_id[test_id] = result
+                    stdout_path.write_text("", encoding="utf-8")
+                    stderr_path.write_text("", encoding="utf-8")
+                    continue
+
+            final_result: TestResult | None = None
+            for attempt in range(1, args.max_attempts + 1):
+                stdout_text, stderr_text, exit_code, duration, error = run_single_attempt(
+                    test, context, results_by_id, repo_root, env
                 )
-                results.append(result)
-                results_by_id[test_id] = result
-                stdout_path.write_text("", encoding="utf-8")
-                stderr_path.write_text("", encoding="utf-8")
-                continue
+                attempt_result = build_result(test, stdout_text, stderr_text, exit_code, duration, error, stdout_path, stderr_path)
+                attempt_result.attempts = attempt
+                final_result = attempt_result
+                if attempt_result.status == "passed":
+                    break
 
-        final_result: TestResult | None = None
-        for attempt in range(1, args.max_attempts + 1):
-            stdout_text, stderr_text, exit_code, duration, error = run_single_attempt(
-                test, context, results_by_id, repo_root, env
-            )
-            attempt_result = build_result(test, stdout_text, stderr_text, exit_code, duration, error, stdout_path, stderr_path)
-            attempt_result.attempts = attempt
-            final_result = attempt_result
-            if attempt_result.status == "passed":
-                break
+            assert final_result is not None
+            final_result.provider_profile = provider_info["profile"]
+            final_result.provider_type = provider_info["provider_type"]
+            final_result.model = provider_info["model"]
+            final_result.repo_path = repo_root
+            final_result.artifact_path = str(run_dir)
+            final_result.timestamp = datetime.now(timezone.utc).isoformat()
 
-        assert final_result is not None
-        final_result.provider_profile = provider_info["profile"]
-        final_result.provider_type = provider_info["provider_type"]
-        final_result.model = provider_info["model"]
-        final_result.repo_path = repo_root
-        final_result.artifact_path = str(run_dir)
-        final_result.timestamp = datetime.now(timezone.utc).isoformat()
+            stdout_path.write_text(stdout_text, encoding="utf-8")
+            stderr_path.write_text(stderr_text, encoding="utf-8")
 
-        # Write final attempt output to logs
-        # Note: if retries happened and last attempt failed, we log the last attempt.
-        # A future enhancement could log each attempt separately.
-        stdout_path.write_text(stdout_text, encoding="utf-8")
-        stderr_path.write_text(stderr_text, encoding="utf-8")
-
-        results.append(final_result)
-        results_by_id[test_id] = final_result
-        print(f"  -> {final_result.status} ({final_result.failure_category or 'ok'}) in {final_result.duration_seconds:.1f}s")
+            results.append(final_result)
+            results_by_id[test_id] = final_result
+            print(f"  -> {final_result.status} ({final_result.failure_category or 'ok'}) in {final_result.duration_seconds:.1f}s")
+    finally:
+        if switched:
+            _restore_profile(repo_root, original_profile)
 
     finished_at = datetime.now(timezone.utc).isoformat()
     summary = {

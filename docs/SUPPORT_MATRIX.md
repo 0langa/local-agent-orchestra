@@ -15,7 +15,7 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 
 | Lane | State | Owner | Entry Points | Evidence | Known Limits |
 | --- | --- | --- | --- | --- | --- |
-| OpenAI-compatible, including Azure OpenAI/Foundry-compatible endpoints | Beta | Providers | CLI provider commands, API provider routes | Provider templates load; Azure `azure-real` historical live evidence; provider tests exist | Needs fresh OpenAI-compatible live lane gate before stable |
+| OpenAI-compatible, including Azure OpenAI/Foundry-compatible endpoints | Beta | Providers | CLI provider commands, API provider routes | Provider templates load; fresh Azure `azure-real` live evidence on 2026-05-15 (doctor, ping-models, provider tests, command-assistant via live_validate runner) | Needs additional stable preset live runs before promotion to stable |
 | Google AI services: Gemini API and Vertex AI | Beta | Providers | CLI provider commands, API provider routes | Templates and adapters load; provider unit coverage exists; Gemini provider smoke is freshly re-verified on 2026-05-14 | Still needs Vertex ADC, stable-preset, and vision live evidence |
 | Self-hosted OSS through OpenAI-compatible endpoints | Beta | Providers | CLI provider commands | Ollama, LM Studio, vLLM, TGI, llama.cpp server, and generic compatible templates exist; localhost compatibility shim smoke passed on 2026-05-14 via `.localtest/mock-ai-server/` | Still needs fresh real local endpoint smoke and model-quality guidance validation |
 | Other integrated providers | Experimental | Providers | CLI provider commands | Templates/adapters exist for current registry | Functional in theory; not polished/proven like top 3 lanes |
@@ -26,7 +26,7 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | --- | --- | --- | --- |
 | `openai_v1` | Beta | Template, adapter, provider tests | Promote with fresh OpenAI live smoke |
 | `openai_compatible` | Beta | Template and shared compatible path | Includes many hosted/local gateways |
-| `azure_foundry` | Beta | Template, adapter, historical live evidence | Main dev lane; needs current baseline live rerun |
+| `azure_foundry` | Beta | Template, adapter, fresh live evidence on 2026-05-15 via live_validate runner | Main dev lane; provider smoke + command-assistant preset passed |
 | `gemini` | Beta | Template, adapter, provider tests, fresh planner smoke on 2026-05-14 | Still needs stable-preset and vision live evidence |
 | `vertex_ai` | Beta | Template, adapter, provider tests | Needs ADC/project/location live rerun |
 | `ollama`, `lm_studio`, `vllm`, `tgi`, `llama_cpp` | Beta | Templates via compatible path | Needs local live endpoint evidence |
