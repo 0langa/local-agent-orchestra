@@ -12,6 +12,9 @@ runner = CliRunner()
 
 
 class TestCliCommands:
+    def test_cli_pretty_exceptions_do_not_show_locals(self) -> None:
+        assert app.pretty_exceptions_show_locals is False
+
     def test_config_dump_help(self) -> None:
         result = runner.invoke(app, ["config-dump", "--help"])
         assert result.exit_code == 0
@@ -47,8 +50,9 @@ class TestCliCommands:
         assert result.exit_code == 0
         assert "ping-models" in result.output
 
-    def test_ping_models_exits_nonzero_on_failure(self, tmp_path) -> None:
+    def test_ping_models_exits_nonzero_on_failure(self, tmp_path, monkeypatch) -> None:
         """AH-AUDIT-004: failing pings must exit nonzero."""
+        monkeypatch.chdir(tmp_path)
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "providers.json").write_text(

@@ -2,11 +2,49 @@
 
 Purpose: track live provider evidence separately from local regression evidence. This file must avoid mixing historical live runs with current drift-sweep checks.
 
-Run live AI checks from repo root with the intended provider profile configured. Keep live retries bounded to 2 attempts with a 120 second timeout per attempt unless a task-specific note says otherwise.
+Run live AI checks from repo root with the intended provider profile configured. Keep live retries bounded to 2 attempts with a 120 second timeout per attempt unless a task-specific note says otherwise. For further Azure preset-quality reruns, keep `azure-real` on deployed `gpt-5.4`, not `gpt-5.4-mini`.
 
 ---
 
 ## Fresh Live Evidence
+
+### Provider Stability Sweep — Azure `gpt-5.4` and Gemini Key Test — 2026-05-15
+
+Goal: close provider-compatibility proof with bounded, low-quota live checks. This does **not** promote `codebase-assistant`; coding workflow stability remains tracked separately.
+
+| Profile | Provider/model | Result | Evidence |
+|---------|----------------|--------|----------|
+| `azure-real` | `azure_foundry` / `gpt-5.4` | pass | `.localtest/runs/20260515-194401-live-validation`: doctor, ping-models, planner/executor/verifier provider tests, and `command-assistant` all passed |
+| `azure-real` | `azure_foundry` / `gpt-5.4` | pass | Tiny generated PNG vision smoke returned `{"color":"red"}` |
+| `gemini-key-test` | `gemini` / `gemini-2.5-flash` | pass | `.localtest/runs/20260515-193551-live-validation`: doctor, ping-models, planner/executor/verifier provider tests, `context-maintainer`, and `file-organizer-dry-run` all passed |
+| `gemini-key-test` | `gemini` / `gemini-2.5-flash` | pass | `.localtest/runs/20260515-193700-live-validation`: `command-assistant`, `docs-maintainer-plan`, `github-maintainer`, and `research-report` passed |
+| `gemini-key-test` | `gemini` / `gemini-2.5-flash` | pass | `.localtest/runs/20260515-194244-live-validation`: `local-document-chat` passed after documents workflow provider-map fix |
+| `gemini-key-test` | `gemini` / `gemini-2.5-flash` | pass | Tiny generated PNG vision smoke returned `{"color":"red"}` |
+| `azure-real` | `azure_foundry` / `gpt-5.4` | fail | `.localtest/runs/20260515-194935-live-validation`: `codebase-assistant` still returned `status='blocked'`; follow-up auto run hit empty PatchPlan |
+
+**Interpretation:**
+
+- Azure Foundry/OpenAI-compatible provider compatibility is stable for text, JSON, vision, provider role smoke, and at least one stable preset path on deployed `gpt-5.4`.
+- Gemini API compatibility is stable for text, JSON, vision, provider role smoke, and multiple preset paths with the temporary `gemini-key-test` key; no 429s were observed in this sweep.
+- `codebase-assistant` remains a workflow-quality blocker, not a provider-compatibility blocker.
+
+### Azure Foundry Capable-Model Rerun — 2026-05-15
+
+Profile `azure-real` was updated locally from `gpt-5.4-mini` to deployed `gpt-5.4` for all roles. The rerun used a clean clone of `../agentheim-testing-enviroment` to avoid stale edits from prior live runs.
+
+Primary run: `.localtest/runs/20260515-191224-live-validation`
+
+| Check | Result | Duration | Evidence |
+|-------|--------|----------|----------|
+| local-document-chat | pass | 28.7s | `status='done'`; run_id `20260515-211226-documents-run` |
+| codebase-assistant | fail | 42.8s | run_id `20260515-211352-run`; workflow returned `status='blocked'` after pytest failed on `test_ignores_boolean_values` (`assert 3 == 2`) |
+| research-report | pass | 74.8s | Follow-up run `.localtest/runs/20260515-191923-live-validation` passed after runner expectation/schema tolerance fixes |
+
+**Interpretation:**
+
+- `local-document-chat` mini-model gap is closed on `gpt-5.4`.
+- `research-report` now passes on `gpt-5.4`; earlier failure was partly runner drift (`ResearchReport(...)` output did not include `status='done'`) and partly schema tolerance/output-budget weakness fixed in this sweep.
+- `codebase-assistant` is still not stable: `gpt-5.4` reaches verification but blocks with real failing pytest evidence instead of completing green.
 
 ### Azure Foundry Full Matrix — 2026-05-15
 
@@ -32,12 +70,12 @@ Profile `azure-real` (provider_type `azure_foundry`, model `gpt-5.4-mini`) via `
 
 **Interpretation:**
 
-- OpenAI-compatible/Azure lane now has full 15-check structured live evidence.
+- OpenAI-compatible/Azure lane now has 15 primary live checks plus 3 safety-negative checks.
 - Provider smoke (doctor, ping-models, 3 role tests): all pass.
-- Stable presets: 2/4 pass (`command-assistant`, `context-maintainer`). `local-document-chat` and `codebase-assistant` fail on `gpt-5.4-mini` — model capability limitation, not code bug.
-- Beta presets: 3/4 pass (`file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`). `research-report` fails with exit code 1 (known-failing).
+- Stable presets on the mini-model run: 2/4 pass (`command-assistant`, `context-maintainer`). Follow-up `gpt-5.4` evidence closes `local-document-chat`; `codebase-assistant` still blocks.
+- Beta presets on the mini-model run: 3/4 pass (`file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`). Follow-up `gpt-5.4` evidence closes `research-report`.
 - Followup paths: `report-command-assistant` and `resume-command-assistant` both pass. Report/resume gap now closed for `command-assistant`.
-- Lane gate partially satisfied. Missing: `local-document-chat`, `codebase-assistant`, `research-report` green runs; Web/Desktop interface smoke; vision.
+- Lane gate partially satisfied. Missing: `codebase-assistant` green run on a capable model; Web/Desktop provider-backed e2e; vision.
 
 ### Safety-Negative Checks — 2026-05-15
 
@@ -64,7 +102,7 @@ This sweep verified docs, governance, CLI smoke, test collection, and the live v
 | Baseline smoke gate | pass after Phase 4 slice | `powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode baseline -NoPrompt` |
 | CLI help smoke | pass | included in directive devtest |
 | Doctor smoke | pass | `doctor --skip-connectivity`, included in directive devtest |
-| Test collection | pass | `pytest --collect-only -q` collected 1230 total tests; default lane selected 1195 and deselected 35 |
+| Test collection | pass | `pytest --collect-only -q` collected 1256 total tests; default lane selected 1220 and deselected 36 |
 | Markdown local links | pass after docs sync | repo-wide `*.md` link scan |
 | Web UI browser smoke | pass | Root loads, API connected, provider profiles visible, presets list with Run buttons, Active Runs section with polling, 0 console errors |
 | Desktop UI server integration | pass | Server thread starts, health + presets endpoints respond; pywebview fallback paths unit-tested |
@@ -233,15 +271,15 @@ These need fresh evidence before claiming a polished baseline:
 
 | Gap | Needed proof |
 |-----|--------------|
-| OpenAI-compatible lane | Provider smoke done. Need codebase-assistant, local-document-chat green runs. Web/Desktop smoke pending. |
-| Google lane | Run Gemini API and Vertex AI smoke, structured JSON output, vision path, one preset end to end |
-| Self-hosted lane | Run Ollama or LM Studio smoke, structured output failure handling, one local preset end to end |
-| Research report | Clean CLI + API + Web live rerun with target repo/input honored |
+| OpenAI-compatible lane | Azure Foundry compatibility stable on `azure-real` / `gpt-5.4`: provider smoke, text/JSON, vision, and `command-assistant` pass. `codebase-assistant` still blocks as workflow quality, not provider connectivity. |
+| Google lane | Gemini API compatibility stable on `gemini-key-test` / `gemini-2.5-flash`: provider smoke, text/JSON, vision, and multiple presets pass. Vertex ADC still unproven and remains beta. |
+| Self-hosted lane | Run Ollama or LM Studio smoke against a real local endpoint, structured output failure handling, one local preset end to end |
+| Research report | CLI live pass on `azure-real` / `gpt-5.4`; API + Web reruns still needed |
 | Resume/report | `command-assistant` report/resume pass 2026-05-15. Need same for `context-maintainer`, `local-document-chat`, `codebase-assistant`. |
-| Web UI | Provider-backed preset run matrix, status polling, and artifact rendering |
-| Desktop UI | Launch, route to local web UI, run one preset, close cleanly |
+| Web UI | Provider-backed preset run matrix, status polling, and artifact rendering; shell/browser smoke already passes |
+| Desktop UI | Launch in a GUI environment, route to local web UI, run one preset, close cleanly; server integration already passes |
 | Tools/adapters | Browser, HTTP, local DB, MCP, WebResearchAdapter, GitHubCliAdapter, MCPClientAdapter |
-| Safety negatives | CLI input validation (invalid role/profile) and approval-required path proven 2026-05-15. Remaining: auth failure, rate limit, timeout, malformed JSON, unsafe patch, path escape. |
+| Safety negatives | CLI input validation, approval-required path, dirty-repo block, and patch-outside-allowed covered. Remaining live proof: auth failure, invalid model, rate-limit recovery, timeout, empty content, malformed JSON, privacy restriction. |
 | Vision | Vision-capable provider path and non-vision rejection path |
 
 ---
@@ -276,6 +314,9 @@ python scripts/live_validate.py --include-tags stable --max-attempts 2
 
 # Run with explicit profile override for evidence logging
 python scripts/live_validate.py --profile azure-real --only doctor,ping-models
+
+# Next Azure capable-model rerun after investigating blocked coding artifact
+python scripts/live_validate.py --profile azure-real --only codebase-assistant --max-attempts 2
 ```
 
 The runner produces:

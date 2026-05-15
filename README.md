@@ -113,7 +113,7 @@ Core Runtime (Generic)    →  DAG execution, policy engine, ledger, model regis
 pytest tests\ -v
 ```
 
-Current local collection: **1133 total tests collected**. The default `pytest -q` lane selects 1098 tests and deselects 35 slow/e2e/lint tests via configured markers.
+Current local collection: **1256 total tests collected**. The default `pytest -q` lane selects 1220 tests and deselects 36 slow/e2e/lint tests via configured markers.
 
 ---
 

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from workflows.coding.agents.coder import CoderAgent
 from workflows.coding.agents.orchestrator import OrchestratorAgent
 from workflows.coding.agents.verifier import VerifierAgent
-from core.schemas_runtime import PatchPlan, ImplementationPlan, VerificationReport
+from core.schemas_runtime import AcceptanceCriterion, PatchPlan, ImplementationPlan, TaskGraph, TaskNode, TaskType, VerificationReport, WorkOrder
 
 
 @pytest.fixture
@@ -108,6 +108,30 @@ class TestOrchestratorAgent:
 
 
 class TestVerifierAgent:
+    def test_prompt_mentions_cumulative_diff_for_fix_orders(self, mock_provider, mock_role):
+        agent = VerifierAgent(mock_provider, mock_role, "sys", VerificationReport)
+        work_order = WorkOrder(
+            id="wo-1-fix-1",
+            title="Add regression coverage",
+            objective="Add a test for the already-applied fix.",
+            relevant_files=["tests/test_main.py"],
+            acceptance_criteria=[AcceptanceCriterion(description="pytest passes")],
+        )
+        plan = ImplementationPlan(
+            summary="Fix bug",
+            detected_repo_type="python",
+            task_graph=TaskGraph(
+                ordered_tasks=[
+                    TaskNode(id="task-1", type=TaskType.EDIT, title="Add regression coverage", work_order=work_order)
+                ]
+            ),
+        )
+
+        prompt = agent.build_prompt("Fix bug", plan, work_order, "diff --git", ["pytest passed"], [])
+
+        assert "git diff is cumulative" in prompt
+        assert "earlier verifier step already accepted" in prompt
+
     def test_parse_valid(self, mock_provider, mock_role):
         agent = VerifierAgent(mock_provider, mock_role, "sys", VerificationReport)
         raw = (

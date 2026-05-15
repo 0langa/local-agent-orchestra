@@ -56,7 +56,7 @@ class SummarizerAgent(BaseAgent[SummaryResult]):
 
     def run_summarize(self, topic: str, gather_result: dict, context_shards: dict[str, str] | None = None):
         prompt = self.build_prompt(topic, gather_result, context_shards=context_shards)
-        return self.run_structured(prompt, max_output_tokens=2500)
+        return self.run_structured(prompt, max_output_tokens=6000)
 
     def _parse(self, raw_output: str) -> SummaryResult:
         data = json.loads(repair_json_text(raw_output))

@@ -76,14 +76,25 @@ Everything outside this set is beta or experimental until promoted.
 - AICtx integration is routed through ContextOps and `.ai-team/runs/` as the canonical runtime artifact store.
 - Tests are broad, with subsystem suites for core, memory, tools, providers, workflows, interfaces, and smoke paths.
 
-### Main Risks
+### Baseline Board
 
-1. **Tool policy path is not unified across interfaces.** API/Web UI directly invoke tools after coarse risk checks instead of always using the policy engine and ledger path.
-2. **Support promise exceeds evidence.** README/docs expose many presets, workflows, providers, interfaces, marketplace, federation, distributed, multimodal, and remote/OCI areas without a consistent support state.
-3. **Provider capability claims are too optimistic.** Templates list streaming, tool calling, JSON, and vision capabilities that are not equally implemented or live-tested across adapters.
-4. **Live validation is inconsistent.** `live-ai-testing.md` contains contradictions around `research-report`, `resume`, `copy`, API/Web coverage, model names, and test counts.
-5. **Interface parity is weak.** CLI, API, Web UI, Desktop, and Guided TUI expose overlapping but not identical behavior and status shapes.
-6. **Docs and instruction drift exist.** Some active docs and checks do not reflect all binding instruction files or current AICtx integration shape.
+Done and compacted:
+
+1. **Governance/evidence cleanup:** support matrix, Tier-1 contracts, live evidence archive, instruction drift checks, and baseline devtest mode exist.
+2. **Safety spine:** API, Web UI, and CLI copy paths route through `ToolInvoker`; medium-risk filesystem operations return explicit approval flows; policy/decision evidence is recorded.
+3. **Run diagnostics:** canonical run summaries are shared by CLI/API/Web stream paths; failed workflow runs write `run_summary.json` and `diagnostics.md`.
+4. **Workflow readiness:** all 8 presets/workflows have support states and readiness checklists; major negative-path smoke gaps are covered.
+5. **Interface parity:** CLI/API parity tests pass; Web UI has browser smoke; Desktop server start path has integration evidence.
+6. **Live validation foundation:** `scripts/live_validate.py` records bounded structured evidence, follow-up report/resume checks, safety negatives, rate-limit classification, and retry/delay controls.
+7. **Advanced-surface decisions:** marketplace, federation, distributed workflows, multimodal, OCI/remote context, and self-improving agents have explicit support states and first-run guard tests.
+
+Still blocking baseline:
+
+1. **Stable preset live proof is partly closed:** `command-assistant` and `local-document-chat` now pass on both Azure `gpt-5.4` and Gemini API; `research-report` passes on both; `codebase-assistant` still blocks on repair-loop/verifier behavior.
+2. **Provider lane proof gaps:** Azure Foundry/OpenAI-compatible and Gemini API compatibility are proven stable; Vertex ADC and self-hosted real endpoint proof still remain.
+3. **Web/Desktop live e2e:** browser smoke proves UI shell behavior, but not a provider-backed preset run from click -> polling -> artifact/error rendering.
+4. **Remaining live safety/failure cases:** auth failure, rate limit, timeout, provider empty content, non-JSON structured output, privacy restriction, and vision/non-vision rejection still need current evidence.
+5. **Final release gate:** broad/full validation and live AI gate must be rerun after the above changes.
 
 ## Roadmap Phases
 
@@ -236,7 +247,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ## 🟡 Phase 2 - Provider Lanes
 
-**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) now has full 18-check structured live evidence via `scripts/live_validate.py` against `azure-real` profile: provider smoke (5/5 pass), stable presets (2/4 pass), beta presets (3/4 pass), report/resume followups (2/2 pass), safety negatives (3/3 pass). Lane 2 (Google) has fresh Gemini API-key path evidence from 2026-05-14 and full matrix attempted 2026-05-15 against `gemini-lane2` — executor/verifier pass, but aggressive 429 rate limits from `gemini-2.5-flash` block reliable full-matrix validation. Lane 3 (self-hosted) now has expanded localhost compatibility shim evidence: mock server in fake mode validates all 17 provider adapter types through localhost-shaped configs (2026-05-15).
+**Status:** Partial as of 2026-05-15. Lane 1 (OpenAI-compatible/Azure) is stable for the Azure Foundry/OpenAI-compatible path: `azure-real` / `gpt-5.4` passes doctor, ping-models, planner/executor/verifier provider tests, text/JSON, vision, and `command-assistant`. Lane 2 is stable for Gemini API: `gemini-key-test` / `gemini-2.5-flash` passes provider smoke, text/JSON, vision, and multiple presets without 429s; Vertex ADC remains beta/unproven. Lane 3 (self-hosted) has localhost mock-shim evidence across all 17 provider adapter types, but still lacks a real local endpoint run.
 
 **Goal:** Make the top 3 provider lanes polished, documented, and empirically proven.
 
@@ -289,6 +300,12 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 - Azure Foundry passes `provider test`, `ping-models`, and at least coding or command-assistant live path.
 - Ollama or LM Studio passes local planner/executor/verifier smoke where model capability is sufficient.
 
+#### Remaining Path
+
+1. Keep `azure-real` role bindings on deployed `gpt-5.4` for future capable-model validation.
+2. Treat `codebase-assistant` failures as Phase 4 workflow work, not an Azure provider blocker.
+3. Add durable scorecard docs for other OpenAI-compatible hosted vendors only after separate live evidence.
+
 ### 🟡 Lane 2: Google AI Services
 
 **Decision:** Gemini API and Vertex AI stay as native Google adapters, not OpenAI-compatible shims.
@@ -312,15 +329,21 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
    - ⚪ Vertex ADC path
    - 🟢 text
    - 🟢 structured JSON
-   - ⚪ vision when configured
+   - 🟢 Gemini vision when configured
 
-**Status note (2026-05-14):** Fresh Gemini API live evidence now proves the API-key path, provider smoke, and tiny text/JSON connectivity with `gemini-live` against `gemini-2.5-flash` via `provider test` and `ping-models`. Vertex ADC and Google vision remain unproven in the current sweep. A stable-preset end-to-end Gemini run was attempted and advanced farther after temporarily adding planner `plan`, but it still stops before success because the temporary `gemini-live` profile does not provide an executor binding with `code_edit`. Default profile was restored to `azure-real` immediately after the attempt.
+**Status note (2026-05-15):** Gemini API compatibility is stable with `gemini-key-test` / `gemini-2.5-flash`: provider smoke, text/JSON, vision, `command-assistant`, `local-document-chat`, `context-maintainer`, `file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`, and `research-report` pass without 429s. Vertex ADC remains unproven.
 
 #### Gates
 
 - Gemini API passes provider test, JSON structured output smoke, and one stable preset.
 - Vertex AI passes provider test with ADC and one stable preset.
 - Gemini or Vertex vision path passes `multimodal.image` describe and OCR if the chosen model declares vision.
+
+#### Remaining Path
+
+1. Replace the temporary `gemini-key-test` key with a durable user key before relying on ongoing Gemini validation.
+2. Separately validate Vertex ADC with project/location/permission failure guidance.
+3. Keep Gemini and Vertex support states separate until Vertex has live proof.
 
 ### 🟡 Lane 3: Self-Hosted Open Source Models
 
@@ -356,6 +379,13 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 - At least two local/self-hosted endpoints pass `provider test`.
 - At least one local/self-hosted endpoint passes a stable non-coding preset.
 - Docs clearly explain expected limitations for smaller OSS models.
+
+#### Remaining Path
+
+1. Start one real local endpoint, preferably Ollama or LM Studio, with a model capable of structured JSON.
+2. Add/use a provider profile for that endpoint, then run `provider test` for planner/executor/verifier.
+3. Run a non-coding stable preset first (`command-assistant` or `local-document-chat`) before attempting coding.
+4. Keep the 17/17 mock-shim result as wiring evidence only, not model-quality evidence.
 
 ### 🟢 Cross-Provider Work
 
@@ -462,7 +492,7 @@ python -m interfaces.cli.cli list-runs --repo .
 
 ## 🟡 Phase 4 - Stable Workflow And Preset Set
 
-**Status:** Partial as of 2026-05-15. Preset and workflow support-state metadata is now embedded in the `Preset` dataclass, `Workflow` base class, and capability registry. All 8 presets and 8 workflows carry `stable_candidate` or `beta` labels matching `SUPPORT_MATRIX.md`. `context-maintainer` is now included in preset smoke expectations. Readiness checklists for all 8 workflows added to `SUPPORT_MATRIX.md`. Fresh live evidence collected via `scripts/live_validate.py`: `command-assistant` and `context-maintainer` passed against `azure-real`; `local-document-chat` and `codebase-assistant` returned `status='failed'` against test repo and remain blocked for stable promotion.
+**Status:** Partial as of 2026-05-15. Metadata/readiness work is complete: all 8 presets/workflows carry support states and all have readiness checklists in `docs/SUPPORT_MATRIX.md`. Local smoke/negative-path coverage is strong enough for the current labels. Stable promotion is still blocked by live evidence breadth: `command-assistant` and `context-maintainer` pass on `azure-real` / `gpt-5.4-mini`, `local-document-chat` passes on `azure-real` / `gpt-5.4`, and `codebase-assistant` blocks on `azure-real` / `gpt-5.4` with failing pytest evidence.
 
 **Goal:** Promote a small, proven set of workflows/presets to stable and label the rest honestly.
 
@@ -519,6 +549,14 @@ Promote these after focused gaps close:
    - 🟢 GitHub API execution path (summarize-failure halt + empty-issues graceful propagation covered by smoke tests 2026-05-15)
 5. 🟢 Add context-maintainer to preset smoke expectations (already in `tests/smoke/test_presets.py`; golden-path e2e tests added for context-maintainer and docs-maintenance 2026-05-15)
 
+### Remaining Path
+
+1. Agent: inspect the `codebase-assistant` blocked live run and decide whether the coding workflow needs verifier-loop repair, stronger task/test alignment, or only additional live attempts with the same capable model.
+2. Agent: add focused regression coverage for any confirmed workflow/runtime gap found in that artifact review.
+3. Agent: run `codebase-assistant` again on a clean test clone after any fix; do not count dirty-repo or stale-artifact runs.
+4. Agent: prove `local-document-chat` and `codebase-assistant` report/resume plus API/Web route behavior.
+5. Agent: only promote a preset from `stable_candidate` to `stable` after CLI + API/Web route evidence, report/resume evidence, docs, and troubleshooting coverage match the promotion gate.
+
 ### Files
 
 - `presets/base.py`
@@ -554,7 +592,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 ## 🟡 Phase 5 - Interface Contract Freeze
 
-**Status:** Partial as of 2026-05-15. CLI and API contracts frozen with parity tests passing. Web UI browser smoke completed: root loads, provider health visible, presets list with Run buttons, Active Runs polling, artifacts/errors visible. Desktop UI server integration verified: background thread starts, health/presets endpoints respond; pywebview/tkinter/browser fallback paths unit-tested. Guided TUI has basic preset selection and questionnaire flows. Remaining: full Web UI preset-run end-to-end with live AI, actual pywebview window launch in GUI environment.
+**Status:** Partial as of 2026-05-15. CLI and API contracts are frozen with parity tests passing. Web UI browser smoke completed: root loads, provider health visible, support-state badges render, presets list with Run buttons, Active Runs polling, artifacts/errors visible. Desktop UI server integration verified: background thread starts, health/presets endpoints respond; pywebview/tkinter/browser fallback paths are unit-tested. Remaining: provider-backed Web UI preset-run e2e and actual pywebview window launch in a GUI environment.
 
 **Goal:** Make CLI, API, Web UI, Desktop, and Guided TUI consistent for Tier-1 journeys.
 
@@ -610,6 +648,13 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
    - artifacts/errors visible 🟢 (rendered in Active Runs card)
    - Desktop launches Web UI and routes correctly 🟢 (server integration tested; pywebview/tkinter/browser fallback paths unit-tested)
 
+### Remaining Path
+
+1. Start Web UI locally against `azure-real` with `gpt-5.4`.
+2. Use Playwright to click a stable preset Run button, wait for `/api/runs/{run_id}` polling to finish, and confirm artifact/error rendering.
+3. Repeat once through Desktop in a GUI-capable environment, or keep Desktop at beta with the explicit "server integration only" limit.
+4. Update `live-ai-testing.md` and `docs/SUPPORT_MATRIX.md` with the exact preset, profile, model, run ID, and UI evidence.
+
 ### Files
 
 - `interfaces/cli/cli.py`
@@ -650,7 +695,7 @@ python -m interfaces.cli.cli copy --help
 
 ## 🟡 Phase 6 - Live Validation Program
 
-**Status:** Partial as of 2026-05-15. Foundation slice complete: `scripts/live_validate.py` provides a repeatable, bounded live validation runner with built-in matrix, structured evidence output (JSONL + summary JSON/Markdown), provider/profile/model detection, failure category classification, configurable max attempts (default 2) with 120-second timeout per attempt, `expect_failure` support for safety-negative tests, and `--delay-between-tests` / `--delay-between-attempts` for rate-limit mitigation. Full matrix run completed against Lane 1 (azure-real): 18 checks, 14 pass, 4 fail. Safety-negative checks added. Lane 2 (Google) matrix attempted against `gemini-lane2` — aggressive 429 rate limits from `gemini-2.5-flash` free tier block reliable testing even with 45s inter-test delays. Contradictory historical results archived in `live-ai-testing.md` with superseded/contradicted markers. Remaining work: Lane 2 with minutes-level delays or paid tier, Lane 3 (self-hosted), vision checks.
+**Status:** Partial as of 2026-05-15. Runner foundation is complete: `scripts/live_validate.py` records structured evidence, provider/profile/model, artifacts, failure categories, bounded retries, safety-negative `expect_failure`, and delay controls. Lane 1 has an 18-check matrix on `azure-real` / `gpt-5.4-mini` plus focused `gpt-5.4` evidence: `local-document-chat` pass, `research-report` pass, `codebase-assistant` blocked. Lane 2 is blocked by Gemini free-tier 429s. Lane 3 has 17/17 localhost mock-shim provider wiring evidence plus an automated slow pytest, but still needs a real local endpoint. Contradictory historical results are archived.
 
 **Goal:** Make live evidence repeatable, bounded, and safe.
 
@@ -712,17 +757,18 @@ python -m interfaces.cli.cli copy --help
 
 #### Safety Negative Cases
 
-- missing provider secret
-- invalid model ID
-- auth failure
-- rate limit/quota
-- network timeout
-- provider empty content
-- provider non-JSON for structured output
-- policy denial
-- privacy restriction
-- patch outside allowed files
-- dirty repo without allow flag
+- ⚪ missing provider secret
+- 🟢 invalid role/profile
+- ⚪ invalid model ID
+- ⚪ auth failure
+- 🟡 rate limit/quota classification exists; live recovery path still needs proof
+- ⚪ network timeout
+- ⚪ provider empty content
+- ⚪ provider non-JSON for structured output
+- 🟢 approval-required/policy-denial path via `copy-denied`
+- ⚪ privacy restriction
+- 🟢 patch outside allowed files covered by `tests/core/test_patching.py`
+- 🟢 dirty repo without allow flag covered by `tests/test_negative_paths.py`
 
 #### Interfaces
 
@@ -746,6 +792,14 @@ python -m interfaces.cli.cli copy --help
 - Each stable support claim has a live evidence row.
 - Failed live checks include a linked issue or roadmap task.
 - No live validation command can retry indefinitely.
+
+### Remaining Path
+
+1. Investigate and rerun the blocked Azure `codebase-assistant` preset slice on `gpt-5.4`.
+2. Add bounded live checks for auth failure, timeout, empty content, non-JSON structured output, and privacy restriction.
+3. Run Google only with enough quota/cooldown to avoid wasting attempts on known 429 behavior.
+4. Run at least one real self-hosted endpoint; keep mock-shim evidence as registry wiring proof.
+5. Add vision and non-vision rejection checks only after the configured provider/model declares vision capability.
 
 ### Verification Gate
 
@@ -820,9 +874,9 @@ python -m interfaces.cli.cli doctor --skip-connectivity
 
 ---
 
-## 🟡 Phase 8 - Advanced Subsystem Decisions
+## 🟢 Phase 8 - Advanced Subsystem Decisions
 
-**Status:** Partial as of 2026-05-15. Initial regression-guard slice complete: `tests/smoke/test_experimental_surfaces.py` verifies no experimental presets/workflows leak into registry, CLI commands don't expose experimental subsystem tokens, and API routes don't contain experimental subsystem paths. Remaining work: support labels in UI, removal from first-run path, promotion criteria per subsystem.
+**Status:** Complete for baseline scope as of 2026-05-15. Support labels now exist in docs and Web UI, provider templates hide experimental options from default first-run lists, `docs/ARCHITECTURE.md` documents promotion criteria, and `tests/smoke/test_experimental_surfaces.py` plus provider-template tests guard against experimental leaks. Actual promotion of marketplace/federation/distributed/multimodal/self-improving surfaces is post-baseline work.
 
 **Goal:** Stop ambiguous semi-support for expensive subsystems.
 
@@ -839,9 +893,9 @@ python -m interfaces.cli.cli doctor --skip-connectivity
 
 ### Work
 
-1. Add support labels in docs and UI.
-2. Remove experimental subsystems from first-run path.
-3. Add promotion criteria per subsystem:
+1. 🟢 Add support labels in docs and UI.
+2. 🟢 Remove experimental subsystems from first-run path.
+3. 🟢 Add promotion criteria per subsystem:
    - owner
    - entrypoints
    - security model
@@ -849,7 +903,7 @@ python -m interfaces.cli.cli doctor --skip-connectivity
    - tests
    - live evidence
    - known limits
-4. Add regression tests ensuring experimental surfaces are not shown as stable.
+4. 🟢 Add regression tests ensuring experimental surfaces are not shown as stable.
 
 ### Files
 
@@ -932,18 +986,20 @@ If `ai_test.ps1` fails twice consecutively with 120-second timeouts, stop and re
 
 Current state as of 2026-05-15:
 
-- Phase 0 🟢, Phase 1 🟢, Phase 7 🟡 mostly done, Phase 8 🟡 partial.
-- Phase 2 🟡: Lane 1 (OpenAI-compatible/Azure) has 18-check live evidence; Lane 2 (Google) blocked by Gemini 429; Lane 3 (self-hosted) has mock-server provider smoke 17/17 pass + automated pytest test.
-- Phase 3 🟡: Canonical run summary and failed-run diagnostics bundle implemented.
-- Phase 4 🟡: Readiness checklists complete; 2/4 stable candidates pass on azure-real / gpt-5.4-mini; promotion to stable needs non-mini model rerun.
-- Phase 5 🟡: CLI/API frozen, parity tests pass, Web UI browser smoke done, Desktop server integration done.
-- Phase 6 🟡: Live validation runner mature with 18-check matrix, safety-negatives, delays, failure classification; Lane 1 evidence recorded; Lane 2/3 and vision gaps remain.
+- 🟢 Phase 0, Phase 1, and Phase 8 are done for baseline scope.
+- 🟡 Phase 2: Azure/OpenAI-compatible and Gemini API compatibility are stable with current live evidence; Vertex ADC and real self-hosted endpoint proof remain.
+- 🟡 Phase 3: canonical summary and failed-run diagnostics are implemented; stable-preset report/resume proof is complete only for `command-assistant`.
+- 🟡 Phase 4: readiness checklists are complete; `local-document-chat` now passes on `gpt-5.4`; stable promotion is still blocked by `codebase-assistant` live failure plus report/resume and API/Web proof gaps.
+- 🟡 Phase 5: CLI/API/Web/Desktop shell parity is strong; provider-backed Web/Desktop e2e is still missing.
+- 🟡 Phase 6: live runner is mature; remaining gaps are `codebase-assistant` capable-model closure, Vertex ADC, real self-hosted endpoint, and broader safety/failure live cases.
+- 🟡 Phase 7: troubleshooting coverage is mostly done; keep adding entries only when new live failure categories appear.
 
 Next sprint priorities:
 
-1. **Phase 8 closure** — finish promotion criteria docs (ARCHITECTURE.md section added; verify SUPPORT_MATRIX.md has security model + known limits for all surfaces).
-2. **Phase 6 safety-negative expansion** — add `dirty-repo` and `patch-outside-allowed` negative-path tests to live runner or smoke suite.
-3. **Phase 4 stable promotion** — rerun `local-document-chat` and `codebase-assistant` with a non-mini capable model; document result.
-4. **Phase 5 Web UI e2e** — verify preset-run start → polling → completed/failed artifact flow with live AI via Playwright.
+1. **Codebase capable-model closure:** inspect `.localtest/runs/20260515-191224-live-validation` and the `20260515-211352-run` artifacts, then fix or rerun based on the observed verifier/pytest failure.
+2. **Stable promotion evidence:** prove report/resume and API/Web route behavior for `local-document-chat` and `codebase-assistant`.
+3. **Web UI live e2e:** use Playwright against Web UI to prove Run button -> polling -> completed/failed artifact rendering for one stable preset.
+4. **Provider lane closure:** run a non-rate-limited Google lane check, Vertex ADC smoke, and one real Ollama/LM Studio/vLLM/TGI/llama.cpp endpoint.
+5. **Safety/failure live cases:** add bounded checks for auth failure, timeout, empty content, non-JSON structured output, privacy restriction, and vision/non-vision behavior.
 
 Do not start new presets, providers, marketplace features, federation features, or analytics until Phase 9 gates are met.

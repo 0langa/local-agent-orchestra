@@ -176,7 +176,7 @@ def plan_task(task_text: str, repo_path: str | Path, write_ledger: bool = False)
     registry = ModelRegistry.from_team_config(team_config, provider_map=DEFAULT_PROVIDER_MAP)
     orchestrator = create_orchestrator_agent(registry)
     prompt = build_plan_prompt(user_task, scan, context_pack)
-    result = orchestrator.run_structured(prompt, max_output_tokens=2500)
+    result = orchestrator.run_structured(prompt, max_output_tokens=6000)
 
     ledger_dir: Path | None = None
     if write_ledger:
@@ -384,6 +384,8 @@ def run_task(
         "run.json",
         {
             "action": "run",
+            "workflow_id": "coding",
+            "preset_id": "codebase-assistant",
             "repo_name": repo_root.name,
             "task": task_text,
             "mode": mode,
@@ -423,7 +425,7 @@ def run_task(
         orchestrator = create_orchestrator_agent(registry)
         verifier = create_verifier_agent(registry)
         prompt = build_plan_prompt(UserTask(request=task_text), scan, context_pack)
-        planning_result = orchestrator.run_structured(prompt, max_output_tokens=2500)
+        planning_result = orchestrator.run_structured(prompt, max_output_tokens=6000)
         ledger.write_text("raw_model_output.txt", planning_result.raw_output)
         if not planning_result.success or planning_result.parsed_output is None:
             raise ExecutionError(planning_result.error or "Planning failed.")

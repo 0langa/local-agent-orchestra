@@ -152,6 +152,11 @@ class TestWorkflowRuntimeImports:
         assert callable(plan_task)
         assert callable(run_task)
 
+    def test_documents_runtime_uses_shared_provider_map(self) -> None:
+        from workflows.documents.provider_map import DEFAULT_PROVIDER_MAP
+        assert "gemini" in DEFAULT_PROVIDER_MAP
+        assert "azure_foundry" in DEFAULT_PROVIDER_MAP
+
     def test_research_runtime_imports(self) -> None:
         from workflows.research.runtime import plan_task, run_task
         assert callable(plan_task)

@@ -2,6 +2,30 @@
 
 ## 2026-05-15
 
+### Provider Stability Sweep — Azure Foundry and Gemini API
+- Promoted Azure Foundry/OpenAI-compatible provider compatibility evidence: `azure-real` / `gpt-5.4` passed doctor, ping-models, planner/executor/verifier provider tests, `command-assistant`, and direct PNG vision smoke.
+- Promoted Gemini API compatibility evidence: `gemini-key-test` / `gemini-2.5-flash` passed provider smoke, text/JSON, direct PNG vision smoke, `command-assistant`, `local-document-chat`, `context-maintainer`, `file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`, and `research-report` without 429s.
+- Fixed documents workflow provider map to use the shared provider registry so Gemini/Vertex-compatible providers can run `local-document-chat`.
+- Disabled Typer local-variable tracebacks in the CLI to avoid raw provider secret exposure in failure artifacts.
+- Added coding runtime metadata/output-budget hardening: `run.json` now records `workflow_id="coding"` and `preset_id="codebase-assistant"`, and coding `run_task` planning uses the same 6000-token structured-output cap as `plan_task`.
+- Clarified verifier prompt handling for cumulative diffs in repair loops. `codebase-assistant` remains blocked by live repair-loop/model-output behavior, so it was not promoted.
+- Updated `live-ai-testing.md`, `docs/SUPPORT_MATRIX.md`, `docs/TIER1_CONTRACTS.md`, and `BASELINE-ROADMAP.md` from exact evidence.
+- Updated README/DEV_TESTING/support/live evidence test counts to 1256 collected, 1220 selected, 36 deselected from the baseline gate.
+
+### Azure `gpt-5.4` Live Rerun — Documents/Research Pass, Codebase Blocked
+- Updated the local `azure-real` provider profile from `gpt-5.4-mini` to deployed `gpt-5.4` for all roles.
+- Ran `scripts/live_validate.py --profile azure-real --only local-document-chat,codebase-assistant,research-report --max-attempts 2` against a clean clone of the test repo.
+- `local-document-chat` passed on `azure-real` / `gpt-5.4`; `research-report` passed after aligning live-runner expectations with `ResearchReport(...)` output; `codebase-assistant` still returned `status='blocked'` after verifier pytest failed on the generated boolean-exclusion test.
+- Hardened research report parsing for object-shaped `executive_summary` and `recommendations`, and raised structured-output caps for research summarization and coding planning to avoid truncated JSON on capable-model runs.
+- Updated `live-ai-testing.md`, `docs/SUPPORT_MATRIX.md`, `docs/TIER1_CONTRACTS.md`, and `BASELINE-ROADMAP.md` with exact capable-model evidence and remaining work.
+
+### Docs Cleanup — Baseline Roadmap Remaining Work
+- Reworked `BASELINE-ROADMAP.md` current-state summary into a compact done/remaining baseline board.
+- Expanded remaining paths for Azure `gpt-5.4` live reruns, Google/Vertex validation, real self-hosted endpoint proof, Web/Desktop live e2e, and remaining safety/failure evidence.
+- Updated `live-ai-testing.md`, `docs/SUPPORT_MATRIX.md`, and `docs/TIER1_CONTRACTS.md` to stop treating stale historical/mini-model results as current promotion proof.
+- Updated README/DEV_TESTING/support/live evidence test counts to 1252 collected, 1216 selected, 36 deselected from the baseline gate.
+- Validation: `python scripts/check-agent-instructions.py`, directive devtest, and baseline devtest pass.
+
 ### Phase 6 Safety-Negative Expansion — Patch Outside Allowed Scope Test
 - Added `TestPatchApplierAllowedFiles` to `tests/core/test_patching.py`.
 - `test_allowed_files_blocks_outside_scope`: verifies `PatchApplier.apply_changes`

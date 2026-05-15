@@ -39,7 +39,7 @@ pytest -q
 pytest -q tests/
 ```
 
-Current collection status: **1230 total tests collected**. The default `pytest -q` lane selects 1195 tests and deselects 35 slow/e2e/lint tests via configured markers.
+Current collection status: **1256 total tests collected**. The default `pytest -q` lane selects 1220 tests and deselects 36 slow/e2e/lint tests via configured markers.
 
 ---
 

@@ -15,8 +15,8 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 
 | Lane | State | Owner | Entry Points | Evidence | Known Limits |
 | --- | --- | --- | --- | --- | --- |
-| OpenAI-compatible, including Azure OpenAI/Foundry-compatible endpoints | Beta | Providers | CLI provider commands, API provider routes | Provider templates load; fresh Azure `azure-real` live evidence on 2026-05-15 (doctor, ping-models, provider tests, command-assistant via live_validate runner) | Needs additional stable preset live runs before promotion to stable |
-| Google AI services: Gemini API and Vertex AI | Beta | Providers | CLI provider commands, API provider routes | Templates and adapters load; provider unit coverage exists; Gemini API-key path re-verified 2026-05-14; full matrix attempted 2026-05-15 against gemini-lane2 — executor/verifier pass, but aggressive 429 rate limits block reliable full-matrix validation | Needs rate-limit mitigation, Vertex ADC, stable-preset, and vision live evidence |
+| OpenAI-compatible, including Azure OpenAI/Foundry-compatible endpoints | Stable for Azure Foundry/OpenAI-compatible path | Providers | CLI provider commands, API provider routes | Provider templates load; `azure-real` / `gpt-5.4` live evidence on 2026-05-15: doctor, ping-models, planner/executor/verifier provider tests, `command-assistant`, text/JSON, and vision pass | Broader hosted compatible vendors remain advanced until separately proven; `codebase-assistant` remains a workflow blocker, not a provider blocker |
+| Google AI services: Gemini API and Vertex AI | Stable for Gemini API; Beta for Vertex AI | Providers | CLI provider commands, API provider routes | Templates/adapters load; `gemini-key-test` / `gemini-2.5-flash` live evidence on 2026-05-15: doctor, ping-models, planner/executor/verifier provider tests, text/JSON, vision, and multiple presets pass without 429 | Vertex ADC/project/location live proof still needed before the whole Google lane is stable |
 | Self-hosted OSS through OpenAI-compatible endpoints | Beta | Providers | CLI provider commands | Ollama, LM Studio, vLLM, TGI, llama.cpp server, and generic compatible templates exist; localhost compatibility shim smoke passed on 2026-05-15 via `.localtest/mock-ai-server/` — all 17 provider adapter types verified through localhost-shaped configs | Still needs fresh real local endpoint smoke and model-quality guidance validation |
 | Other integrated providers | Experimental | Providers | CLI provider commands | Templates/adapters exist for current registry | Functional in theory; not polished/proven like top 3 lanes |
 
@@ -26,8 +26,8 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | --- | --- | --- | --- |
 | `openai_v1` | Beta | Template, adapter, provider tests | Promote with fresh OpenAI live smoke |
 | `openai_compatible` | Beta | Template and shared compatible path | Includes many hosted/local gateways |
-| `azure_foundry` | Beta | Template, adapter, fresh live evidence on 2026-05-15 via live_validate runner | Main dev lane; provider smoke + command-assistant preset passed |
-| `gemini` | Beta | Template, adapter, provider tests, fresh API-key path smoke 2026-05-14; full matrix attempted 2026-05-15 — executor/verifier pass, planner blocked by 429 rate limit | Needs rate-limit handling, stable-preset, and vision live evidence |
+| `azure_foundry` | Stable | Template, adapter, fresh live evidence on 2026-05-15 via live_validate runner and direct vision smoke | Main dev lane; provider smoke, text/JSON, vision, and command-assistant preset passed on `gpt-5.4` |
+| `gemini` | Stable | Template, adapter, provider tests, fresh live evidence on 2026-05-15 via `gemini-key-test`: provider smoke, text/JSON, vision, and multiple presets pass | Temporary test key should be replaced with durable user key for ongoing validation |
 | `vertex_ai` | Beta | Template, adapter, provider tests | Needs ADC/project/location live rerun |
 | `ollama`, `lm_studio`, `vllm`, `tgi`, `llama_cpp` | Beta | Templates via compatible path | Needs local live endpoint evidence |
 | `anthropic`, `aws_bedrock`, `oci_genai`, `cohere`, `perplexity`, `ollama_cloud` | Experimental | Templates/adapters/tests vary by provider | Keep available; do not present as first-run path |
@@ -37,13 +37,13 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 
 | Preset | Workflow | State | Entry Points | Evidence | Known Limits |
 | --- | --- | --- | --- | --- | --- |
-| `command-assistant` | `command_assistant` | Stable candidate | CLI, API, Web route | Smoke/unit coverage; unsafe-command propagation and parse-failure negative tests added; fresh live pass on 2026-05-15 via azure-real / gpt-5.4-mini | Needs additional preset live runs for stable promotion |
-| `local-document-chat` | `documents` | Stable candidate | CLI, API, Web route | Smoke/unit coverage; fresh live run on 2026-05-15 via azure-real / gpt-5.4-mini returned `status='failed'` with empty answer against test repo | Binary/excluded-dir and empty-repo behavior covered by smoke tests; live RAG quality gap against test repo |
-| `codebase-assistant` | `coding` | Stable candidate | CLI, API, Web route | Broad tests and historical capable-model live pass; patch rollback, repeated-failure guard, max-diff-lines, dirty-repo bypass, no-tests skip covered by tests; fresh live run on 2026-05-15 via azure-real / gpt-5.4-mini returned `status='failed'` against test repo | Smaller models can fail coding quality; gpt-5.4-mini may not reliably complete coding workflow end-to-end |
-| `context-maintainer` | `context_maintainer` | Stable candidate | CLI, API/Web context routes | ContextOps tests and historical dry-run evidence; golden-path e2e workflow execution test added; fresh live pass on 2026-05-15 via azure-real / gpt-5.4-mini | Apply/write paths remain review-first |
+| `command-assistant` | `command_assistant` | Stable candidate | CLI, API, Web route | Smoke/unit coverage; unsafe-command propagation and parse-failure negative tests added; fresh live pass on 2026-05-15 via azure-real / gpt-5.4 and gemini-key-test / gemini-2.5-flash | Needs report/resume and non-CLI evidence before `stable` |
+| `local-document-chat` | `documents` | Stable candidate | CLI, API, Web route | Smoke/unit coverage; fresh live pass on 2026-05-15 via azure-real / gpt-5.4 and gemini-key-test / gemini-2.5-flash after provider-map fix | Needs report/resume and non-CLI evidence before `stable` |
+| `codebase-assistant` | `coding` | Stable candidate | CLI, API, Web route | Broad tests and historical capable-model live pass; patch rollback, repeated-failure guard, max-diff-lines, dirty-repo bypass, no-tests skip, and allowed-files guard covered by tests; fresh live runs on 2026-05-15 via azure-real / gpt-5.4 still returned `status='blocked'` or empty PatchPlan | Still blocks on coding workflow repair-loop/verifier behavior; not stable-ready |
+| `context-maintainer` | `context_maintainer` | Stable candidate | CLI, API/Web context routes | ContextOps tests and historical dry-run evidence; golden-path e2e workflow execution test added; fresh live pass on 2026-05-15 via azure-real / gpt-5.4-mini | Apply/write paths remain review-first; needs stable-promotion report/resume evidence |
 | `file-organizer` | `file_organization` | Beta | CLI, API, Web route | Fresh live pass 2026-05-15 (dry-run via azure-real / gpt-5.4-mini); missing-source, overwrite-block, and dry-run smoke tests |
 | `docs-maintainer` | `docs_maintenance` | Beta | CLI, API, Web route | Fresh live pass 2026-05-15 (plan mode via azure-real / gpt-5.4-mini); golden-path e2e test added; detect-failure halt, update-failure halt, and empty-stale-docs graceful paths covered by smoke tests | Apply and aligner paths need live proof |
-| `research-report` | `research` | Beta | CLI, API, Web route | Unit/deep path evidence; gather-failure halt and empty-sources graceful paths covered by smoke tests | Live run fails exit code 1 on azure-real / gpt-5.4-mini (2026-05-15); needs clean rerun |
+| `research-report` | `research` | Beta | CLI, API, Web route | Unit/deep path evidence; gather-failure halt and empty-sources graceful paths covered by smoke tests; fresh CLI live pass on 2026-05-15 via azure-real / gpt-5.4 | API/Web live reruns still needed |
 | `github-maintainer` | `github_maintenance` | Beta | CLI, API, Web route | Fresh live pass 2026-05-15 (issue summary + PR draft via azure-real / gpt-5.4-mini); summarize-failure halt and empty-issues graceful paths covered by smoke tests | |
 
 ## Workflow Readiness Checklists (Stable Candidates)
@@ -58,11 +58,11 @@ This matrix records what Agentheim currently promises. A surface is not stable u
 | **CLI path** | ✅ `start command-assistant` | ✅ `start local-document-chat` | ✅ `run`, `plan`, `start codebase-assistant` | ✅ `ctx scan/run/verify/status` |
 | **API path** | ✅ `POST /api/presets/{preset_id}/run` | ✅ `POST /api/presets/{preset_id}/run` | ✅ `POST /api/presets/{preset_id}/run` | ✅ `POST /api/ctx/*` routes |
 | **Docs** | ✅ USER_GUIDE.md, CLI-COMMANDS.md | ✅ USER_GUIDE.md | ✅ USER_GUIDE.md, CLI-COMMANDS.md | ✅ USER_GUIDE.md ctx section |
-| **Live evidence** | 🟡 Historical pass; needs current top-3 lane rerun | 🟡 Historical pass | 🟡 Historical capable-model pass | 🟡 Historical dry-run evidence |
+| **Live evidence** | 🟢 Fresh pass on azure-real / gpt-5.4 and Gemini | 🟢 Fresh pass on azure-real / gpt-5.4 and Gemini | 🔴 Fresh gpt-5.4 run blocked on verifier/repair-loop outcome | 🟢 Fresh pass on azure-real / gpt-5.4-mini and Gemini |
 
 **Notes:**
 - `context-maintainer` is architecturally different: it delegates execution to the AICtx runtime rather than using Agentheim's workflow agent pipeline. Its readiness checklist reflects this boundary. Agentheim-native artifacts, final reports, and negative-path tests are gaps that must close before stable promotion.
-- All four stable candidates need fresh live evidence on the current top-3 provider lane before promotion to `stable`.
+- Provider compatibility evidence is now strong for Azure Foundry and Gemini API. Preset promotion still needs report/resume and non-CLI evidence, and `codebase-assistant` still needs green live repair-loop behavior.
 
 ## Workflow Readiness Checklists (Beta Candidates)
 
@@ -120,5 +120,8 @@ Last docs baseline sweep on 2026-05-15:
 - `powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode directive -NoPrompt` passed.
 - `powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode baseline -NoPrompt` passed.
 - Markdown local link scan passed across 94 repo docs.
-- `pytest --collect-only -q` collected 1230 total tests; default lane selected 1195 and deselected 35.
-- Full live validation matrix (15 checks) run against azure-real / gpt-5.4-mini: 11 pass, 4 fail.
+- `pytest --collect-only -q` collected 1256 total tests; default lane selected 1220 and deselected 36.
+- Full live validation matrix plus safety negatives (18 checks) run against azure-real / gpt-5.4-mini: 14 pass, 4 fail.
+- Focused capable-model rerun against azure-real / gpt-5.4: provider smoke, `command-assistant`, `local-document-chat`, `research-report`, and vision pass; `codebase-assistant` remains blocked.
+- Gemini API rerun against `gemini-key-test` / `gemini-2.5-flash`: provider smoke, text/JSON, vision, `command-assistant`, `local-document-chat`, `context-maintainer`, `file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`, and `research-report` pass.
+- Localhost mock-shim provider smoke passed across 17 provider adapter types; this is wiring evidence, not real local model-quality evidence.

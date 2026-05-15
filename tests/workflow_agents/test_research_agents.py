@@ -363,6 +363,27 @@ class TestReporterAgent:
         result = agent._parse(raw)
         assert result.sources == ["s1", "s2"]
 
+    def test_object_summary_and_recommendations_normalized(self, agent):
+        raw = json.dumps(
+            {
+                "topic": "Repo summary",
+                "executive_summary": {
+                    "topic": "Repo summary",
+                    "summary": "Repository needs clearer evidence.",
+                    "scope": "local project",
+                },
+                "sections": [{"heading": "Evidence", "content": "Some details"}],
+                "recommendations": [
+                    {"priority": "high", "recommendation": "Run pytest."},
+                    {"priority": "medium", "action": "Update docs."},
+                ],
+            }
+        )
+        result = agent._parse(raw)
+        assert "Repository needs clearer evidence." in result.executive_summary
+        assert any("high" in rec and "Run pytest." in rec for rec in result.recommendations)
+        assert any("medium" in rec and "Update docs." in rec for rec in result.recommendations)
+
     def test_confidence_fallback_medium(self, agent):
         raw = json.dumps(
             {

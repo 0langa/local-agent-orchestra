@@ -53,7 +53,7 @@ from workflows.coding.runtime import plan_task, run_task
 from interfaces.cli.ctx_commands import ctx_app
 from interfaces.cli.provider_commands import provider_app
 
-app = typer.Typer(help="Local-first three-agent runtime.")
+app = typer.Typer(help="Local-first three-agent runtime.", pretty_exceptions_show_locals=False)
 app.add_typer(ctx_app, name="ctx", rich_help_panel="Context")
 app.add_typer(provider_app, name="provider", rich_help_panel="Getting Started")
 console = Console()

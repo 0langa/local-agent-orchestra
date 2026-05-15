@@ -9,6 +9,21 @@ from workflows.research.agents.base import BaseAgent
 from workflows.research.reports.final_report import ResearchReport
 
 
+def _stringify(value) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("summary", "recommendation", "action", "description", "content", "details"):
+            if key in value and value[key]:
+                base = str(value[key])
+                priority = value.get("priority")
+                return f"{priority}: {base}" if priority else base
+        return "; ".join(f"{key}={item}" for key, item in value.items())
+    if isinstance(value, list):
+        return "; ".join(_stringify(item) for item in value)
+    return str(value)
+
+
 class ReporterAgent(BaseAgent[ResearchReport]):
     def build_prompt(self, topic: str, summary_result: dict, context_shards: dict[str, str] | None = None) -> str:
         summaries = summary_result.get("summaries", [])
@@ -80,6 +95,14 @@ class ReporterAgent(BaseAgent[ResearchReport]):
                 else:
                     normalized_sources.append(str(item))
             data["sources"] = normalized_sources
+        data["executive_summary"] = _stringify(data.get("executive_summary", ""))
+        raw_recommendations = data.get("recommendations", [])
+        if isinstance(raw_recommendations, list):
+            data["recommendations"] = [_stringify(item) for item in raw_recommendations]
+        elif raw_recommendations:
+            data["recommendations"] = [_stringify(raw_recommendations)]
+        else:
+            data["recommendations"] = []
 
         try:
             return self.output_schema.model_validate(data)

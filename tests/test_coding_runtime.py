@@ -252,6 +252,27 @@ def run_task_mocks(tmp_path):
 
 
 class TestRunTask:
+    def test_run_task_writes_resume_metadata_and_uses_large_plan_budget(self, run_task_mocks):
+        repo_path = run_task_mocks["repo_path"]
+        mocks = run_task_mocks["mocks"]
+        ledger = run_task_mocks["ledger"]
+
+        plan = _make_plan(1, "inspect")
+        mocks["create_orchestrator_agent"].return_value.run_structured.return_value = MagicMock(
+            success=True, parsed_output=plan.model_dump(), raw_output="raw", error=None
+        )
+
+        run_task("do thing", repo_path)
+
+        run_json_call = next(
+            call for call in ledger.write_json.call_args_list if call.args[0] == "run.json"
+        )
+        run_payload = run_json_call.args[1]
+        assert run_payload["workflow_id"] == "coding"
+        assert run_payload["preset_id"] == "codebase-assistant"
+        mocks["create_orchestrator_agent"].return_value.run_structured.assert_called_once()
+        assert mocks["create_orchestrator_agent"].return_value.run_structured.call_args.kwargs["max_output_tokens"] == 6000
+
     def test_run_task_blocks_when_more_than_20_tasks(self, run_task_mocks):
         repo_path = run_task_mocks["repo_path"]
         mocks = run_task_mocks["mocks"]

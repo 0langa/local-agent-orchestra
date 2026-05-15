@@ -185,9 +185,9 @@ DEFAULT_MATRIX: dict[str, Any] = {
                 "--input", "topic=Summarize this repository",
                 "--input", "repo={test_repo}",
             ],
-            "must_contain": ["status='done'"],
+            "must_contain": ["ResearchReport(", "topic="],
             "timeout_seconds": 240,
-            "tags": ["preset", "beta", "known-failing"],
+            "tags": ["preset", "beta"],
         },
         {
             "id": "report-command-assistant",

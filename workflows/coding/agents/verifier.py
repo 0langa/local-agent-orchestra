@@ -28,6 +28,11 @@ class VerifierAgent(BaseAgent[VerificationReport]):
             f"Git diff:\n{git_diff[:6000]}\n\n"
             f"Command outputs:\n{commands}\n\n"
             f"Relevant file excerpts:\n{excerpts}\n\n"
+            "The git diff is cumulative for the whole run. For fix or test-only work orders, "
+            "do not fail the current work order only because the cumulative diff still contains "
+            "production-code changes that an earlier verifier step already accepted. Judge whether "
+            "the current work order's requested outcome is satisfied by the current repo state and "
+            "command evidence.\n\n"
             "Return only valid JSON matching VerificationReport. Provide evidence for any failure."
         )
 
