@@ -320,6 +320,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-tags", default="", help="Comma-separated tags to require.")
     parser.add_argument("--exclude-tags", default="destructive", help="Comma-separated tags to skip.")
     parser.add_argument("--max-attempts", type=int, default=2, help="Max attempts per test (default 2).")
+    parser.add_argument("--delay-between-tests", type=int, default=0, help="Seconds to sleep between tests (default 0).")
+    parser.add_argument("--delay-between-attempts", type=int, default=0, help="Seconds to sleep between retry attempts (default 0).")
     parser.add_argument("--list", action="store_true", help="List tests and exit.")
     return parser.parse_args()
 
@@ -644,6 +646,8 @@ def main() -> int:
                 final_result = attempt_result
                 if attempt_result.status == "passed":
                     break
+                if attempt < args.max_attempts and args.delay_between_attempts > 0:
+                    time.sleep(args.delay_between_attempts)
 
             assert final_result is not None
             final_result.provider_profile = provider_info["profile"]
@@ -659,6 +663,8 @@ def main() -> int:
             results.append(final_result)
             results_by_id[test_id] = final_result
             print(f"  -> {final_result.status} ({final_result.failure_category or 'ok'}) in {final_result.duration_seconds:.1f}s")
+            if index < len(selected) and args.delay_between_tests > 0:
+                time.sleep(args.delay_between_tests)
     finally:
         if switched:
             _restore_profile(repo_root, original_profile)

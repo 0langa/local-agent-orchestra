@@ -130,13 +130,36 @@ Profile `gemini-lane2` (expanded 14-role profile) with model `gemini-2.5-flash` 
 | invalid-profile | pass | 1.5s | rejected cleanly |
 | copy-denied | pass | 1.5s | `Approval required` + `Aborted` |
 
+### Gemini Matrix with 45s Delay — 2026-05-15
+
+Re-ran with `--delay-between-tests 45` to test rate-limit mitigation:
+
+| Check | Result | Duration | Evidence |
+|-------|--------|----------|----------|
+| doctor | fail | 5.6s | 429 Too Many Requests (model connectivity check) |
+| ping-models | fail | 61.2s | 429 on multiple roles |
+| provider-planner | fail | 5.4s | 429 (2 attempts) |
+| provider-executor | fail | 5.6s | 429 |
+| provider-verifier | fail | 5.4s | 429 |
+| command-assistant | fail | 5.7s | 429 |
+| local-document-chat | fail | 2.0s | missing output (not rate limit) |
+| codebase-assistant | fail | 6.4s | 429 |
+| context-maintainer | pass | 1.6s | `ContextRunReport` emitted |
+| file-organizer-dry-run | pass | 5.8s | `status='done'` |
+| docs-maintainer-plan | fail | 5.6s | 429 |
+| github-maintainer | fail | 5.4s | 429 |
+| research-report | fail | 5.3s | missing output (not rate limit) |
+| invalid-role | pass | 1.1s | rejected cleanly |
+| invalid-profile | pass | 0.8s | rejected cleanly |
+| copy-denied | pass | 0.9s | `Approval required` + `Aborted` |
+
 **Interpretation:**
 
 - Gemini provider adapter works: executor and verifier role tests pass when not rate-limited.
-- **Aggressive rate limiting:** `gemini-2.5-flash` free tier returns 429 Too Many Requests after just a few sequential calls. This blocks reliable full-matrix testing.
+- **Aggressive rate limiting:** `gemini-2.5-flash` free tier returns 429 Too Many Requests after just a few sequential calls. **45-second inter-test delays are insufficient.** The rate limit appears to require minutes-level cooldown or a paid tier.
 - `context-maintainer` and `file-organizer-dry-run` pass because they either don't hit the Gemini endpoint or use AICtx caching.
 - Vertex ADC path: not tested. Vision path: not tested.
-- Lane 2 gate partially satisfied. Need: rate-limit mitigation (delays/backoff), clean planner test, one preset end-to-end without 429.
+- Lane 2 gate partially satisfied. Need: minutes-level delays or paid-tier Gemini for reliable matrix testing; clean planner test; one preset end-to-end without 429.
 
 ---
 

@@ -2,6 +2,14 @@
 
 ## 2026-05-15
 
+### Phase 6 Slice — Runner Delay Feature + Gemini Rate-Limit Retest
+- Added `--delay-between-tests` and `--delay-between-attempts` CLI args to
+  `scripts/live_validate.py` for rate-limit mitigation.
+- Re-ran Gemini lane with 45s inter-test delays: still fails with 429 on most
+  provider tests. Free-tier rate limit requires minutes-level cooldown.
+- Updated `live-ai-testing.md` and `BASELINE-ROADMAP.md` with delay-test results.
+- Validation: delay feature works; evidence JSONL verified; baseline gate pass.
+
 ### Phase 2 Slice — Google Lane Live Matrix Attempt + Rate Limit Discovery
 - Created `gemini-lane2` profile with 14 roles (same provider/secret as `gemini-live`).
 - Ran full 18-check matrix against `gemini-lane2` / `gemini-2.5-flash`.
