@@ -8,6 +8,7 @@
 - Added `llama-local` provider profile (`openai_compatible`, `http://127.0.0.1:8080/v1`, no auth).
 - Verified `provider test` passes against the local endpoint.
 - 3B model initially blocked by RAM (~500 MB free); freed ~6 GB by killing leaked MCP servers, pausing AV, and stopping WARP, then loaded 3B successfully.
+- Preset tests against local 3B endpoint: `provider test` and `ping-models` pass; `command-assistant` fails at parser structured-output parsing; `local-document-chat` fails at indexer truncated JSON (max_tokens limit). Failures are model-quality, not provider-connectivity.
 - Updated `BASELINE-ROADMAP.md`, `SUPPORT_MATRIX.md`, `live-ai-testing.md` with Lane 3 real endpoint evidence.
 
 ### Cleanup — Remove Temporary Gemini API Key Profile

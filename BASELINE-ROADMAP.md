@@ -384,7 +384,7 @@ powershell -ExecutionPolicy Bypass -File .\devtest\run-devtest.ps1 -Mode targete
 
 1. ~~Start one real local endpoint...~~ Done: llama.cpp server at `127.0.0.1:8080/v1` with `Qwen2.5-3B-Instruct` passes `provider test`.
 2. ~~Upgrade to a 1B–3B model...~~ Done: 3B model loaded after RAM cleanup.
-3. Run a non-coding stable preset (`command-assistant` or `local-document-chat`) through the local endpoint.
+3. ~~Run a non-coding stable preset...~~ Attempted: `command-assistant` failed at parser structured-output parsing; `local-document-chat` failed at indexer truncated JSON (3B model hit max_tokens before completing schema). Both failures are model-quality, not provider-connectivity.
 4. Keep the 17/17 mock-shim result as wiring evidence only, not model-quality evidence.
 
 ### 🟢 Cross-Provider Work

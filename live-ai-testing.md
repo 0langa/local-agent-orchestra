@@ -14,7 +14,9 @@ Real local endpoint smoke using llama.cpp server in `.localtest/llama.cpp/`.
 
 | Profile | Provider/model | Result | Evidence |
 |---------|----------------|--------|----------|
-| `llama-local` | `openai_compatible` / `qwen2.5-3b` | pass | `provider test` planner role passes; chat completions API responds with valid JSON |
+| `llama-local` | `openai_compatible` / `qwen2.5-3b` | pass | `provider test` + `ping-models` all 4 roles pass; chat completions API responds with valid JSON |
+| `llama-local` | `openai_compatible` / `qwen2.5-3b` | fail | `start command-assistant` → parser structured-output parsing fails |
+| `llama-local` | `openai_compatible` / `qwen2.5-3b` | fail | `start local-document-chat` → indexer JSON truncated at max_tokens |
 
 **Setup:**
 - Binary: llama.cpp b9165 win-cpu-x64 from GitHub releases
@@ -22,7 +24,7 @@ Real local endpoint smoke using llama.cpp server in `.localtest/llama.cpp/`.
 - Endpoint: `http://127.0.0.1:8080/v1`
 - Scripts: `start-server.ps1` / `stop-server.ps1` in `.localtest/llama.cpp/`
 
-**Note:** 3B model loaded after RAM cleanup (killed leaked MCP servers, paused AV, stopped WARP). Preset-quality validation still pending.
+**Note:** 3B model loaded after RAM cleanup (killed leaked MCP servers, paused AV, stopped WARP). Provider lane wiring is proven. Presets fail due to model-quality limits (structured JSON output, token budget) — not provider connectivity.
 
 ### Provider Stability Sweep — Azure `gpt-5.4` and Gemini Key Test — 2026-05-15
 
