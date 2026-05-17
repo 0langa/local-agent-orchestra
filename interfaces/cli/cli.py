@@ -910,9 +910,14 @@ def commands_cmd(
 def main() -> None:
     try:
         app()
-    except (ConfigError, AIteamError) as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        sys.exit(1)
+    except (typer.BadParameter, typer.Exit):
+        raise
+    except Exception as exc:
+        from core.public_api import catalog_entry_for, format_cli_message
+
+        entry = catalog_entry_for(exc)
+        console.print(f"[red]{format_cli_message(entry, exc)}[/red]")
+        sys.exit(entry.exit_code)
 
 
 if __name__ == "__main__":

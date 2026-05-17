@@ -79,6 +79,10 @@ from core.run_view import build_run_view as build_run_view
 from core.run_view import list_run_views as list_run_views
 
 # ─── Error classification & retry ───────────────────────────────────
+from core.error_catalog import ErrorCatalogEntry as ErrorCatalogEntry
+from core.error_catalog import catalog_entry_for as catalog_entry_for
+from core.error_catalog import format_api_response as format_api_response
+from core.error_catalog import format_cli_message as format_cli_message
 from core.error_classification import ErrorCategory as ErrorCategory
 from core.error_classification import classify_error as classify_error
 from core.error_classification import error_summary as error_summary
@@ -285,6 +289,10 @@ __all__ = [
     "build_run_view",
     "list_run_views",
     # Error / retry
+    "ErrorCatalogEntry",
+    "catalog_entry_for",
+    "format_api_response",
+    "format_cli_message",
     "ErrorCategory",
     "classify_error",
     "error_summary",

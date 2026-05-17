@@ -197,13 +197,13 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         try:
             return await call_next(request)
         except Exception as exc:
-            summary = error_summary(exc)
-            status_code = 500
-            if isinstance(exc, ValueError):
-                status_code = 400
-            if isinstance(exc, SafetyError):
-                status_code = 409
-            return JSONResponse(status_code=status_code, content=summary)
+            from core.public_api import catalog_entry_for, format_api_response
+
+            entry = catalog_entry_for(exc)
+            return JSONResponse(
+                status_code=entry.http_status,
+                content=format_api_response(entry, exc),
+            )
 
     tool_registry = ToolRegistry(repo_root)
     core_tool_registry = create_core_tool_registry(repo_root)

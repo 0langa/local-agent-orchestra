@@ -443,14 +443,13 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         return AictxContextOps(cfg)
 
     def _ctx_exc(exc: Exception) -> None:
-        from core.public_api import error_summary
+        from core.public_api import catalog_entry_for, format_api_response
 
-        summary = error_summary(exc)
-        if isinstance(exc, ValueError):
-            raise HTTPException(status_code=400, detail=summary) from exc
-        if isinstance(exc, SafetyError):
-            raise HTTPException(status_code=409, detail=summary) from exc
-        raise HTTPException(status_code=500, detail=summary) from exc
+        entry = catalog_entry_for(exc)
+        raise HTTPException(
+            status_code=entry.http_status,
+            detail=format_api_response(entry, exc),
+        ) from exc
 
     # ------------------------------------------------------------------
     # Routes
