@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +26,7 @@ from config.config import (
     save_profiles_document,
 )
 from core.public_api import ConfigError, RunExecutor, RunStatus, RunView, list_run_views
+from core.public_api import ResumeOrchestrator, ToolRegistry, WorkflowRunner, PolicyEngine, RunLedger, EventType, build_model_registry, get_workflow, load_run, build_run_view
 from interfaces.run_hooks import register_default_run_hooks
 from presets.base import PRESET_REGISTRY, PresetInputError
 from presets.catalog import CATALOG, PresetCatalogItem, QuestionSchema
@@ -29,6 +34,7 @@ from interfaces.readiness import ReadinessState, build_readiness_state
 
 
 product_app = typer.Typer(help="Beginner product commands.")
+runs_app = typer.Typer(help="Inspect and recover runs.", invoke_without_command=True)
 console = Console()
 
 _BEGINNER_PROVIDER_CHOICES = {
@@ -328,6 +334,89 @@ def _render_use_text(task_id: str, item: PresetCatalogItem, payload: dict[str, A
     console.print(payload["next_action"])
 
 
+def _render_runs_list(views: list[RunView]) -> None:
+    if not views:
+        console.print("No runs found.")
+        return
+    table = Table(title="Runs")
+    table.add_column("Run ID", style="green")
+    table.add_column("Status")
+    table.add_column("Summary")
+    table.add_column("Resume")
+    for view in views:
+        table.add_row(view.run_id, view.status, view.summary, "yes" if view.resume_available else "no")
+    console.print(table)
+
+
+def _open_path(path: Path) -> None:
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return
+    if sys.platform == "darwin":
+        subprocess.run(["open", str(path)], check=False)
+        return
+    subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def _report_path_for_view(view: RunView) -> Path | None:
+    if view.report_path:
+        path = Path(view.report_path)
+        if path.exists():
+            return path
+    return None
+
+
+def _resume_run(repo_root: Path, run_id: str) -> dict[str, Any]:
+    run_dir = repo_root / ".ai-team" / "runs" / run_id
+    if not run_dir.exists():
+        raise typer.BadParameter(f"Run '{run_id}' not found under {repo_root}")
+
+    ledger = RunLedger(repo_root=repo_root, run_dir=run_dir)
+    events = ledger.read_ledger()
+    started = next((event for event in events if event.event_type == EventType.RUN_INITIATED), None)
+
+    workflow_id = ""
+    metadata = {}
+    if started is not None:
+        workflow_id = str(started.payload.get("workflow_id", "")).strip()
+        metadata = started.payload.get("metadata") or {}
+
+    if not workflow_id:
+        try:
+            run_data = load_run(repo_root, run_id)
+        except Exception:
+            run_data = {}
+        if run_data:
+            for key in ("workflow_id", "workflow", "action"):
+                val = run_data.get(key)
+                if isinstance(val, str) and val.strip():
+                    workflow_id = val.strip()
+                    break
+            metadata = run_data.get("metadata") or {}
+
+    if not workflow_id:
+        raise typer.BadParameter(f"Run '{run_id}' is missing workflow metadata")
+
+    workflow_entry = get_workflow(workflow_id)
+    config = load_team_config()
+    registry = build_model_registry(config)
+    workflow = workflow_entry.factory(
+        model_registry=registry,
+        tool_registry=ToolRegistry(),
+        policy_engine=PolicyEngine(),
+        ledger=ledger,
+    )
+    runner = WorkflowRunner()
+    resume_manager = ResumeOrchestrator(repo_root)
+    results = resume_manager.resume(run_id, workflow, runner, metadata=metadata)
+    return {
+        "run_id": run_id,
+        "workflow_id": workflow_id,
+        "resumed_steps": [result.step_id for result in results],
+        "all_success": all(result.success for result in results),
+    }
+
+
 @product_app.command("setup", rich_help_panel="Getting Started")
 def setup_cmd(
     provider: str | None = typer.Option(None, "--provider", help="Beginner provider choice."),
@@ -460,3 +549,120 @@ def use_cmd(
         console.print_json(json.dumps(payload))
         return
     _render_use_text(selected_task_id, item, payload)
+
+
+@runs_app.callback(invoke_without_command=True)
+def runs_cmd(
+    ctx: typer.Context,
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    """List, inspect, report, resume, or open run artifacts."""
+    if ctx.invoked_subcommand is not None:
+        return
+    views = list_run_views(repo.resolve())
+    if as_json:
+        console.print_json(json.dumps([view.model_dump(mode="json") for view in views]))
+        return
+    _render_runs_list(views)
+
+
+@runs_app.command("list")
+def runs_list_cmd(
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    views = list_run_views(repo.resolve())
+    if as_json:
+        console.print_json(json.dumps([view.model_dump(mode="json") for view in views]))
+        return
+    _render_runs_list(views)
+
+
+@runs_app.command("show")
+def runs_show_cmd(
+    run_id: str,
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    view = build_run_view(repo.resolve(), run_id)
+    if as_json:
+        console.print_json(json.dumps(view.model_dump(mode="json")))
+        return
+    console.print_json(json.dumps(view.model_dump(mode="json")))
+
+
+@runs_app.command("report")
+def runs_report_cmd(
+    run_id: str,
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    view = build_run_view(repo.resolve(), run_id)
+    report_path = _report_path_for_view(view)
+    if report_path is None:
+        raise typer.BadParameter(f"No report found for run '{run_id}'")
+    content = report_path.read_text(encoding="utf-8")
+    if as_json:
+        console.print_json(json.dumps({"run_id": run_id, "report_path": str(report_path), "content": content}))
+        return
+    console.print(content)
+
+
+@runs_app.command("resume")
+def runs_resume_cmd(
+    run_id: str,
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    summary = _resume_run(repo.resolve(), run_id)
+    if as_json:
+        console.print_json(json.dumps(summary))
+        return
+    console.print_json(json.dumps(summary))
+
+
+@runs_app.command("open-folder")
+def runs_open_folder_cmd(
+    run_id: str,
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    view = build_run_view(repo.resolve(), run_id)
+    artifact_dir = Path(view.artifact_dir)
+    if as_json:
+        console.print_json(json.dumps({"run_id": run_id, "artifact_dir": str(artifact_dir)}))
+        return
+    _open_path(artifact_dir)
+    console.print(f"Opened: {artifact_dir}")
+
+
+product_app.add_typer(runs_app, name="runs", rich_help_panel="Getting Started", help="Inspect and recover runs.")
+
+
+@product_app.command("open", rich_help_panel="Getting Started")
+def open_cmd(
+    port: int = typer.Option(8765, "--port", help="Port for the local Web UI."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Start the Web UI without opening a browser."),
+    desktop: bool = typer.Option(False, "--desktop", help="Launch the desktop wrapper instead."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    """Open the local Agentheim UI on localhost."""
+    url = f"http://127.0.0.1:{port}"
+    if desktop:
+        from interfaces.desktop_ui.app import run_desktop_app
+
+        if as_json:
+            console.print_json(json.dumps({"mode": "desktop", "url": url, "port": port}))
+            return
+        run_desktop_app(port=port, use_tray=True)
+        return
+
+    if as_json:
+        console.print_json(json.dumps({"mode": "web", "url": url, "port": port, "opened_browser": not no_browser}))
+        return
+
+    if not no_browser:
+        webbrowser.open(url)
+    console.print(f"Agentheim Web UI: {url}")
+    console.print("Press Ctrl+C in the server terminal to stop it.")
