@@ -54,6 +54,7 @@ from tools.mcp.config import load_mcp_config
 from workflows.coding.runtime import plan_task, run_task
 
 from interfaces.cli.ctx_commands import ctx_app
+from interfaces.cli.product_commands import product_app
 from interfaces.cli.provider_commands import provider_app
 
 app = typer.Typer(help="Local-first three-agent runtime.", pretty_exceptions_show_locals=False)
@@ -62,6 +63,12 @@ app.add_typer(
     name="ctx",
     rich_help_panel="Context & Artifacts",
     help="Context operations: init, scan, run, verify, status, clean, public-docs, and OCI subcommands.",
+)
+app.add_typer(
+    product_app,
+    name="",
+    rich_help_panel="Getting Started",
+    help="Beginner product commands: setup.",
 )
 app.add_typer(
     provider_app,
