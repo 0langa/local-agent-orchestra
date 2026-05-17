@@ -16,7 +16,15 @@ class MCPClientAdapter:
 
     def call(self, tool_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.enabled:
-            raise RuntimeError("MCP adapter is disabled.")
+            raise RuntimeError(
+                "MCP adapter is disabled. "
+                "To enable MCP, create .ai-team/mcp.json with server configurations, "
+                "or use the real MCP stack via tools.mcp.register_mcp_tools()."
+            )
         if self.allowlist and tool_name not in self.allowlist:
             raise RuntimeError(f"MCP tool '{tool_name}' is not in allowlist.")
-        raise RuntimeError("MCP client adapter has no configured backend.")
+        raise RuntimeError(
+            "MCP client adapter has no configured backend. "
+            "Create .ai-team/mcp.json with server configurations, "
+            "or use tools.mcp.register_mcp_tools(registry, repo_root) to load real MCP servers."
+        )

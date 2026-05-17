@@ -53,8 +53,8 @@ def _resolve_processor() -> MultimodalProcessor:
         logger.warning("Unknown vision provider '%s'", provider)
 
     raise RuntimeError(
-        "Vision model not configured. Set AGENTHEIM_VISION_PROVIDER=openai or claude, "
-        "or configure a provider with vision capability."
+        "Vision is not configured. Set AGENTHEIM_VISION_PROVIDER=openai or claude, "
+        "set OPENAI_API_KEY or ANTHROPIC_API_KEY, or configure a provider with vision capability."
     )
 
 

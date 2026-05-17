@@ -225,7 +225,8 @@ class TestLocalProviderUnavailable:
         with patch("interfaces.readiness.load_team_config", return_value=config):
             with patch("interfaces.readiness.socket.create_connection") as mock_conn:
                 mock_conn.return_value = MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
-                state = build_readiness_state(skip_connectivity=True)
+                with patch("interfaces.integration_checks.check_all_optional_integrations", return_value=[]):
+                    state = build_readiness_state(skip_connectivity=True)
         assert state.status == ReadinessStatus.ready
         assert state.local_reachability_ok is True
 
@@ -286,7 +287,8 @@ class TestModelConnectivity:
                 mock_model.config.role = ModelRole.PLANNER
                 mock_registry.return_value.resolve_model.return_value = mock_model
                 mock_registry.return_value.create_provider.return_value = mock_provider
-                state = build_readiness_state()
+                with patch("interfaces.integration_checks.check_all_optional_integrations", return_value=[]):
+                    state = build_readiness_state()
         assert state.status == ReadinessStatus.ready
         assert state.model_connectivity_ok is True
 
@@ -295,7 +297,8 @@ class TestModelConnectivity:
         with patch("interfaces.readiness.load_team_config", return_value=config):
             with patch("interfaces.readiness.build_model_registry") as mock_registry:
                 mock_registry.side_effect = Exception("should not be called")
-                state = build_readiness_state(skip_connectivity=True)
+                with patch("interfaces.integration_checks.check_all_optional_integrations", return_value=[]):
+                    state = build_readiness_state(skip_connectivity=True)
         assert state.status == ReadinessStatus.ready
         assert state.model_connectivity_ok is None
 
@@ -319,7 +322,8 @@ class TestReadyProfile:
                 mock_model.config.role = ModelRole.PLANNER
                 mock_registry.return_value.resolve_model.return_value = mock_model
                 mock_registry.return_value.create_provider.return_value = mock_provider
-                state = build_readiness_state()
+                with patch("interfaces.integration_checks.check_all_optional_integrations", return_value=[]):
+                    state = build_readiness_state()
         assert state.status == ReadinessStatus.ready
         assert state.profile_name == "prod"
         assert len(state.configured_providers) == 1

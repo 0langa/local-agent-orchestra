@@ -193,6 +193,10 @@ class BrowserTool(BaseTool):
         except Exception:
             return False
 
+    @staticmethod
+    def _playwright_install_guidance() -> str:
+        return "Install Playwright: pip install playwright && playwright install chromium"
+
     # ------------------------------------------------------------------
     # Operations
     # ------------------------------------------------------------------
@@ -251,7 +255,7 @@ class BrowserTool(BaseTool):
 
     def _screenshot(self, url: str, save_path: str | None, timeout: int, session_id: str | None) -> ToolResult:
         if not self._playwright_available():
-            return ToolResult(success=False, error="Screenshot requires Playwright which is not available.")
+            return ToolResult(success=False, error=f"Screenshot requires Playwright which is not available. {self._playwright_install_guidance()}")
         target = self._resolve_save_path(save_path)
         try:
             page = self._get_page(url, timeout, session_id)
@@ -277,7 +281,7 @@ class BrowserTool(BaseTool):
         if not selector:
             return ToolResult(success=False, error="Parameter 'selector' is required for click.")
         if not self._playwright_available():
-            return ToolResult(success=False, error="Click requires Playwright which is not available.")
+            return ToolResult(success=False, error=f"Click requires Playwright which is not available. {self._playwright_install_guidance()}")
         try:
             page = self._get_page(url, timeout, session_id)
             page.locator(selector).first.click(timeout=timeout * 1000)
@@ -289,7 +293,7 @@ class BrowserTool(BaseTool):
         if not selector:
             return ToolResult(success=False, error="Parameter 'selector' is required for fill.")
         if not self._playwright_available():
-            return ToolResult(success=False, error="Fill requires Playwright which is not available.")
+            return ToolResult(success=False, error=f"Fill requires Playwright which is not available. {self._playwright_install_guidance()}")
         try:
             page = self._get_page(url, timeout, session_id)
             page.locator(selector).first.fill(value, timeout=timeout * 1000)
@@ -301,7 +305,7 @@ class BrowserTool(BaseTool):
         if not script:
             return ToolResult(success=False, error="Parameter 'script' is required for evaluate.")
         if not self._playwright_available():
-            return ToolResult(success=False, error="Evaluate requires Playwright which is not available.")
+            return ToolResult(success=False, error=f"Evaluate requires Playwright which is not available. {self._playwright_install_guidance()}")
         try:
             page = self._get_page(url, timeout, session_id)
             result = page.evaluate(script)

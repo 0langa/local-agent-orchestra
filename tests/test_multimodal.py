@@ -61,4 +61,4 @@ class TestImageTool:
         tool = ImageTool()
         result = tool.invoke({"operation": "describe", "image_b64": "abc"}, ToolContext())
         assert result.success is False
-        assert "Vision model not configured" in result.error
+        assert "Vision is not configured" in result.error

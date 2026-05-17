@@ -77,17 +77,35 @@ class WebResearchAdapter:
 
     def search(self, query: str) -> dict[str, Any]:
         if not self.enabled:
-            return {"query": query, "source": "disabled", "results": []}
+            return {
+                "query": query,
+                "source": "unavailable",
+                "error": "Web research is disabled.",
+                "setup_guidance": "Enable web research by setting enabled=True when creating the adapter, or install duckduckgo-search: pip install duckduckgo-search",
+                "results": [],
+            }
 
         # Try duckduckgo-search first
         if self._ddg.available:
             try:
                 return self._ddg.search(query)
-            except Exception:
-                pass
+            except Exception as exc:
+                return {
+                    "query": query,
+                    "source": "unavailable",
+                    "error": f"duckduckgo-search failed: {exc}",
+                    "setup_guidance": "Install or upgrade duckduckgo-search: pip install -U duckduckgo-search",
+                    "results": [],
+                }
 
         # Fallback to urllib scraping
         try:
             return UrllibSearchAdapter().search(query)
         except Exception as exc:
-            return {"query": query, "source": "unavailable", "error": str(exc), "results": []}
+            return {
+                "query": query,
+                "source": "unavailable",
+                "error": str(exc),
+                "setup_guidance": "Install duckduckgo-search for reliable web research: pip install duckduckgo-search",
+                "results": [],
+            }

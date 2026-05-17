@@ -25,10 +25,14 @@ if "duckduckgo_search" not in sys.modules:
 # ---------------------------------------------------------------------------
 
 class TestWebResearchAdapter:
-    def test_disabled_returns_empty(self):
+    def test_disabled_returns_unavailable_with_guidance(self):
         adapter = WebResearchAdapter(repo_root="/tmp", enabled=False)
         result = adapter.search("test query")
-        assert result == {"query": "test query", "source": "disabled", "results": []}
+        assert result["query"] == "test query"
+        assert result["source"] == "unavailable"
+        assert "disabled" in result["error"].lower()
+        assert "setup_guidance" in result
+        assert result["results"] == []
 
     def test_ddg_available_uses_ddg(self):
         with patch("duckduckgo_search.DDGS") as MockDDGS:
@@ -44,21 +48,18 @@ class TestWebResearchAdapter:
         assert result["query"] == "query"
         assert result["results"] == [{"title": "T", "url": "U", "snippet": "S"}]
 
-    def test_ddg_fails_falls_back_to_urllib(self):
-        fallback_result = {
-            "query": "query",
-            "source": "urllib",
-            "results": [{"title": "Fallback", "url": "http://example.com", "snippet": ""}],
-        }
+    def test_ddg_fails_returns_unavailable_with_guidance(self):
         with patch("duckduckgo_search.DDGS") as MockDDGS:
             mock_client = MagicMock()
             mock_client.text.side_effect = Exception("DDG boom")
             MockDDGS.return_value = mock_client
             with patch.object(DuckDuckGoSearchAdapter, "available", True):
                 adapter = WebResearchAdapter(repo_root="/tmp", enabled=True)
-                with patch.object(UrllibSearchAdapter, "search", return_value=fallback_result):
-                    result = adapter.search("query")
-        assert result == fallback_result
+                result = adapter.search("query")
+        assert result["source"] == "unavailable"
+        assert "duckduckgo-search failed" in result["error"].lower()
+        assert "setup_guidance" in result
+        assert result["results"] == []
 
     def test_both_fail_returns_unavailable_error(self):
         with patch("duckduckgo_search.DDGS") as MockDDGS:
@@ -89,8 +90,9 @@ class TestGitHubCliAdapter:
     def test_not_available_when_gh_missing(self):
         with patch("tools.git.github_cli.shutil.which") as mock_which:
             mock_which.return_value = None
-            adapter = GitHubCliAdapter(repo_root="/tmp")
-            assert adapter.available is False
+            with patch("tools.git.github_cli.os.getenv", return_value=None):
+                adapter = GitHubCliAdapter(repo_root="/tmp")
+                assert adapter.available is False
 
     def test_view_issue_runs_gh_command(self):
         with patch("tools.git.github_cli.shutil.which") as mock_which:

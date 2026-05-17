@@ -391,27 +391,9 @@ def build_readiness_state(
 
     optional_integrations: list[OptionalIntegrationState] = []
     if check_optional_integrations:
-        try:
-            from agentheim.context_ops_impl import AictxContextOps
-            from agentheim.vendor.aictx.config import AictxConfig
+        from interfaces.integration_checks import check_all_optional_integrations
 
-            AictxContextOps(AictxConfig())
-            optional_integrations.append(
-                OptionalIntegrationState(
-                    integration_id="context_ops",
-                    available=True,
-                    detail="AICtx-backed ContextOps import and initialization ok",
-                )
-            )
-        except Exception as exc:
-            optional_integrations.append(
-                OptionalIntegrationState(
-                    integration_id="context_ops",
-                    available=False,
-                    detail=str(exc),
-                    next_action="ContextOps is an internal dependency; check vendor/aictx setup.",
-                )
-            )
+        optional_integrations = check_all_optional_integrations(repo_root=None)
 
     any_optional_unavailable = any(not oi.available for oi in optional_integrations)
 
