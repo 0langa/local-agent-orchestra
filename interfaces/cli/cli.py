@@ -59,7 +59,7 @@ app.add_typer(
     ctx_app,
     name="ctx",
     rich_help_panel="Context & Artifacts",
-    help="Context pipeline commands: init, scan, run, verify, status, clean, public-docs, and OCI subcommands.",
+    help="Context operations: init, scan, run, verify, status, clean, public-docs, and OCI subcommands.",
 )
 app.add_typer(
     provider_app,

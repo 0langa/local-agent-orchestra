@@ -25,6 +25,8 @@ The CLI is built with Typer. The lists below are derived from the current comman
 | `guided` | Launch the guided TUI preset picker. | none |
 | `memory` | Interact with global memory. | `ACTION` = `get|set|history|profile`, `--key`, `--value`, `--model-id` |
 | `doctor` | Diagnose configuration and environment issues. | `--skip-connectivity`, `--oci` |
+| `provider` | Manage provider profiles, secrets, templates, and role bindings. | subcommands |
+| `ctx` | Run context operations and OCI artifact commands. | subcommands |
 | `mcp-list` | List tools from configured MCP servers. | `--config` |
 | `mcp-call` | Invoke an MCP tool directly. | `TOOL_NAME`, `--arg key=value`, `--config` |
 | `desktop` | Launch the desktop UI wrapper. | `--port`, `--no-tray` |

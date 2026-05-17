@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.run_executor import RunExecutor, RunHook
+from core.public_api import RunExecutor
 
 
 class _DefaultRunHook:

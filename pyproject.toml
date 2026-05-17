@@ -48,6 +48,11 @@ desktop = ["pywebview>=5.0", "pystray>=0.19"]
 oci = ["oci>=2.120.0"]
 aws = ["boto3>=1.34.0"]
 google = ["google-auth>=2.29.0"]
+dev = [
+  "pytest>=8.2.0",
+  "pytest-cov",
+  "playwright",
+]
 
 [project.scripts]
 agentheim = "interfaces.cli.cli:main"
@@ -81,4 +86,13 @@ exclude = [
   "Agent-Team*",
   "devtest*",
   "extracted*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-m 'not slow'"
+markers = [
+  "e2e: marks tests as end-to-end (real browser / network calls)",
+  "slow: marks tests as slow (stress tests, integration tests, lint checks)",
 ]
