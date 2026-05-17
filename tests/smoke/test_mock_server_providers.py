@@ -71,6 +71,11 @@ def _run_mock_server(port: int) -> None:
 class TestMockServerProviderSmoke:
     @pytest.mark.slow
     def test_all_local_provider_profiles_respond(self, mock_server_port: int) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        server_py = repo_root / ".localtest" / "mock-ai-server" / "server.py"
+        if not server_py.exists():
+            pytest.skip("local mock AI server fixture is not present")
+
         server_thread = threading.Thread(
             target=_run_mock_server, args=(mock_server_port,), daemon=True
         )

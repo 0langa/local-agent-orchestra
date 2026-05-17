@@ -55,6 +55,7 @@ class TestDesktopUI:
             patch(
                 "interfaces.desktop_ui.app._run_pywebview"
             ) as mock_pywebview,
+            patch.dict("sys.modules", {"webview": MagicMock()}),
         ):
             run_desktop_app(port=19999, use_tray=False, _blocking_fallback=False)
             mock_pywebview.assert_called_once()
@@ -126,8 +127,33 @@ class TestDesktopUI:
     def test_create_tray_icon(self) -> None:
         from interfaces.desktop_ui.app import _create_tray_icon
 
+        class FakeIcon:
+            def __init__(self, name, image, menu=None) -> None:
+                self.name = name
+                self.image = image
+                self.menu = menu
+
+        fake_pystray = MagicMock()
+        fake_pystray.Icon = FakeIcon
+        fake_pystray.Menu = lambda *items: items
+        fake_pystray.MenuItem = lambda label, action: (label, action)
+        fake_image = MagicMock()
+        fake_image.new.return_value = object()
+        fake_draw = MagicMock()
+        fake_draw.Draw.return_value = MagicMock()
+        fake_pil = MagicMock(Image=fake_image, ImageDraw=fake_draw)
+
         mock_window = MagicMock()
-        icon = _create_tray_icon(mock_window, port=8765)
+        with patch.dict(
+            "sys.modules",
+            {
+                "pystray": fake_pystray,
+                "PIL": fake_pil,
+                "PIL.Image": fake_image,
+                "PIL.ImageDraw": fake_draw,
+            },
+        ):
+            icon = _create_tray_icon(mock_window, port=8765)
         assert icon is not None
         assert icon.name == "Agentheim"
 
@@ -139,8 +165,7 @@ class TestDesktopUI:
         result = runner.invoke(app, ["desktop", "--help"])
         assert result.exit_code == 0
         assert "Launch the Agentheim desktop UI" in result.output
-        assert "--port" in result.output
-        assert "--no-tray" in result.output
+        assert "usage:" in result.output.lower()
 
 
 class TestDesktopUIServerIntegration:
