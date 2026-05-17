@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from core.path_security import safe_child_path, safe_project_path, safe_run_id
 from agentheim.vendor.aictx.config import AictxConfig
 from agentheim.vendor.aictx.context.fact_extractor import extract_facts
 from agentheim.vendor.aictx.context.lockfile import build_lockfile_from_inventory, load_lockfile, write_lockfile
@@ -57,12 +58,13 @@ class AictxContextOps(ContextOps):
 
     def init(self, repo_root: Path) -> None:
         """Initialize *repo_root* for context processing."""
-        ignore_path = repo_root / ".aictxignore"
+        repo_root = safe_project_path(repo_root)
+        ignore_path = safe_child_path(repo_root, ".aictxignore")
         if not ignore_path.exists():
             ignore_path.write_text("# AICtx custom ignore patterns\n", encoding="utf-8")
 
         inventory = scan_repository(repo_root)
-        context_dir = repo_root / self.config.project.context_dir
+        context_dir = safe_child_path(repo_root, self.config.project.context_dir)
         context_dir.mkdir(parents=True, exist_ok=True)
         existing_lock = load_lockfile(context_dir)
         lock = build_lockfile_from_inventory(inventory)
@@ -99,14 +101,15 @@ class AictxContextOps(ContextOps):
             raise ValueError("keep_runs must be >= 0")
 
         removed: list[str] = []
+        repo_root = safe_project_path(repo_root)
 
         # Canonical store
-        runs_dir = repo_root / ".ai-team" / "runs"
+        runs_dir = safe_child_path(repo_root, ".ai-team", "runs")
         if runs_dir.exists():
             all_runs = sorted([p for p in runs_dir.iterdir() if p.is_dir()])
             targets: list[Path] = []
             if run_id:
-                target = runs_dir / run_id
+                target = safe_child_path(runs_dir, safe_run_id(run_id))
                 if target.exists() and target.is_dir():
                     targets = [target]
             elif keep_runs is not None:
@@ -120,12 +123,12 @@ class AictxContextOps(ContextOps):
             kept = []
 
         # Migration cleanup: also remove from legacy .aictx/runs/
-        legacy_runs_dir = repo_root / ".aictx" / "runs"
+        legacy_runs_dir = safe_child_path(repo_root, ".aictx", "runs")
         if legacy_runs_dir.exists():
             legacy_targets: list[Path] = []
             legacy_all = sorted([p for p in legacy_runs_dir.iterdir() if p.is_dir()])
             if run_id:
-                lt = legacy_runs_dir / run_id
+                lt = safe_child_path(legacy_runs_dir, safe_run_id(run_id))
                 if lt.exists() and lt.is_dir():
                     legacy_targets = [lt]
             elif keep_runs is not None:
@@ -147,6 +150,7 @@ class AictxContextOps(ContextOps):
     # ------------------------------------------------------------------
 
     def scan(self, repo_root: Path) -> RepositoryInventory:
+        repo_root = safe_project_path(repo_root)
         raw = scan_repository(repo_root)
         return RepositoryInventory(raw=raw)
 
@@ -156,9 +160,9 @@ class AictxContextOps(ContextOps):
         scope: str = "full",
         existing_lock: Any | None = None,
     ) -> ContextPlan:
-        repo_root = Path(inventory.repo_root) if inventory.repo_root else Path.cwd()
-        context_dir = repo_root / self.config.project.context_dir
-        agents_md = repo_root / self.config.project.agents_file
+        repo_root = safe_project_path(Path(inventory.repo_root) if inventory.repo_root else Path.cwd())
+        context_dir = safe_child_path(repo_root, self.config.project.context_dir)
+        agents_md = safe_child_path(repo_root, self.config.project.agents_file)
         plan_dict = plan_context(
             inventory=inventory.raw,
             existing_context_dir=context_dir if context_dir.exists() else None,
@@ -176,6 +180,7 @@ class AictxContextOps(ContextOps):
         plan: ContextPlan,
         provider: Any | None = None,
     ) -> GeneratedContext:
+        repo_root = safe_project_path(repo_root)
         if provider is None:
             from agentheim.vendor.aictx.llm.dry_run import DryRunProvider
             provider = DryRunProvider()
@@ -208,9 +213,10 @@ class AictxContextOps(ContextOps):
         from agentheim.vendor.aictx.context.pipeline import _build_patch
         from agentheim.vendor.aictx.io.files import safe_write
 
+        repo_root = safe_project_path(repo_root)
         # Re-scan to get fresh inventory for lockfile
         inventory_raw = scan_repository(repo_root)
-        out_dir = repo_root / ".ai-team" / "runs" / "agentheim-ctx" / "out"
+        out_dir = safe_child_path(repo_root, ".ai-team", "runs", "agentheim-ctx", "out")
         out_dir.mkdir(parents=True, exist_ok=True)
 
         generated_paths = write_context_scaffold(
@@ -240,7 +246,7 @@ class AictxContextOps(ContextOps):
         generated_paths.append(staged_context_dir / "context.lock.json")
 
         patch_text = _build_patch(repo_root=repo_root, out_dir=out_dir)
-        patch_path = repo_root / ".ai-team" / "runs" / "agentheim-ctx" / "aictx.patch"
+        patch_path = safe_child_path(repo_root, ".ai-team", "runs", "agentheim-ctx", "aictx.patch")
         safe_write(patch_path, patch_text)
 
         if write_mode == "apply":
@@ -269,6 +275,8 @@ class AictxContextOps(ContextOps):
         provider: Any | None = None,
     ) -> WriteReport:
         """Run the full local Phase-1 pipeline and return enriched report."""
+        repo_root = safe_project_path(repo_root)
+        run_id = safe_run_id(run_id)
         if allow_ai:
             if provider is None:
                 from config.config import ModelRole, load_team_config
@@ -306,7 +314,9 @@ class AictxContextOps(ContextOps):
         return WriteReport(
             generated_files=report.generated_files,
             lockfile_path=f"{self.config.project.context_dir}/context.lock.json",
-            patch_text=Path(report.patch_path).read_text(encoding="utf-8") if report.patch_path and Path(report.patch_path).exists() else "",
+            patch_text=safe_child_path(repo_root, Path(report.patch_path)).read_text(encoding="utf-8")
+            if report.patch_path and safe_child_path(repo_root, Path(report.patch_path)).exists()
+            else "",
             run_report=report,
             timing=report.timing,
             entropy=report.entropy,
@@ -317,6 +327,7 @@ class AictxContextOps(ContextOps):
     # ------------------------------------------------------------------
 
     def verify(self, repo_root: Path, strict: bool = False) -> VerificationResult:
+        repo_root = safe_project_path(repo_root)
         report = verify_detailed(repo_root, strict=strict)
         return VerificationResult(
             result=report.result,
@@ -325,6 +336,7 @@ class AictxContextOps(ContextOps):
         )
 
     def status(self, repo_root: Path, strict: bool = False) -> ContextStatus:
+        repo_root = safe_project_path(repo_root)
         report = verify_detailed(repo_root, strict=strict)
         return ContextStatus(
             is_stale=report.result != "PASS",
@@ -345,6 +357,7 @@ class AictxContextOps(ContextOps):
         repo_root: Path,
         scope: str = "full",
     ) -> PublicDocsImpactReport:
+        repo_root = safe_project_path(repo_root)
         docs_map = build_public_docs_map(repo_root)
         return PublicDocsImpactReport(
             entries=[entry.model_dump(mode="json") for entry in docs_map.entries],
@@ -358,6 +371,7 @@ class AictxContextOps(ContextOps):
         write_mode: str = "patch",
     ) -> Path | None:
         """Generate patches for impacted public docs."""
+        repo_root = safe_project_path(repo_root)
         return update_public_docs(
             repo_root=repo_root,
             scope=scope,  # type: ignore[arg-type]

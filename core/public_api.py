@@ -36,6 +36,9 @@ from core.errors import VerificationError as VerificationError
 # ─── Repo helpers ───────────────────────────────────────────────────
 from core.repo.redaction import safe_text_excerpt as safe_text_excerpt
 from core.repo.scanner import inspect_repository as inspect_repository
+from core.path_security import safe_child_path as safe_child_path
+from core.path_security import safe_project_path as safe_project_path
+from core.path_security import safe_run_id as safe_run_id
 
 # ─── Resume ─────────────────────────────────────────────────────────
 from core.replay_engine import ReplayEngine as ReplayEngine
@@ -261,6 +264,9 @@ __all__ = [
     # Repo helpers
     "inspect_repository",
     "safe_text_excerpt",
+    "safe_child_path",
+    "safe_project_path",
+    "safe_run_id",
     # Deprecated — still exported for backward compatibility
     "build_context_pack",
     "ContextPacker",

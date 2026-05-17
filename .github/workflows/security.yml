@@ -38,29 +38,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v5
+        uses: github/codeql-action/init@v4
         with:
           languages: python
+          config-file: ./.github/codeql/codeql-config.yml
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v5
+        uses: github/codeql-action/autobuild@v4
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v5
+        uses: github/codeql-action/analyze@v4
 
   scorecard:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
       id-token: write
     steps:
       - uses: actions/checkout@v6
       - name: Run Scorecard
         uses: ossf/scorecard-action@v2.4.3
         with:
-          results_file: results.sarif
-          results_format: sarif
           publish_results: true
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v5
-        with:
-          sarif_file: results.sarif

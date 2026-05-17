@@ -1,0 +1,4 @@
+name: Agentheim CodeQL
+
+paths-ignore:
+  - agentheim/vendor/aictx/**

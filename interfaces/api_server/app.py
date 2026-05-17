@@ -44,6 +44,9 @@ from core.public_api import (
     interface_policy_config,
     list_run_views,
     list_workflows as cap_list_workflows,
+    safe_child_path,
+    safe_project_path,
+    safe_run_id,
 )
 from interfaces.common.run_views import run_status_payload
 from memory.bus import MemoryBus
@@ -611,7 +614,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
 
     @app.get("/api/status", response_model=StatusResponse, tags=["system"])
     def api_status(request: Request, profile: str | None = None, repo: str | None = None) -> StatusResponse:
-        repo_path = Path(repo).resolve() if repo else repo_root
+        repo_path = safe_project_path(repo) if repo else repo_root
         readiness = build_readiness_state(profile=profile, check_optional_integrations=True)
         recent_runs: list[dict[str, Any]] = []
         for view in list_run_views(repo_path)[:10]:
@@ -1038,13 +1041,17 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     @app.get("/api/runs/{run_id}", response_model=CanonicalRunSummary, tags=["runs"])
     def get_run_status(run_id: str) -> CanonicalRunSummary:
         """Get the status of a run."""
+        try:
+            run_id = safe_run_id(run_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail={"error": "invalid_run_id", "message": str(exc)}) from exc
         # First check in-memory executor
         record = run_executor.get(run_id)
         if record is not None:
             return run_status_payload(repo_root, run_id, record)
 
         # Fallback to disk
-        run_dir = repo_root / ".ai-team" / "runs" / run_id
+        run_dir = safe_child_path(repo_root, ".ai-team", "runs", run_id)
         if not run_dir.exists():
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
@@ -1055,6 +1062,10 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         """Stream run status updates via Server-Sent Events."""
         import asyncio
 
+        try:
+            run_id = safe_run_id(run_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail={"error": "invalid_run_id", "message": str(exc)}) from exc
         record = run_executor.get(run_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
@@ -1093,7 +1104,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_init(request: CtxInitRequest):
         ops = _get_ops()
         try:
-            ops.init(Path(request.project).resolve())
+            ops.init(safe_project_path(request.project))
         except Exception as exc:
             _ctx_exc(exc)
         return {"status": "ok"}
@@ -1102,7 +1113,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_scan(request: CtxScanRequest):
         ops = _get_ops()
         try:
-            inventory = ops.scan(Path(request.project).resolve())
+            inventory = ops.scan(safe_project_path(request.project))
         except Exception as exc:
             _ctx_exc(exc)
         raw = inventory.raw
@@ -1124,7 +1135,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         run_id = f"api-ctx-{uuid.uuid4().hex[:8]}"
         try:
             report = ops.run_pipeline(
-                repo_root=Path(request.project).resolve(),
+                repo_root=safe_project_path(request.project),
                 run_id=run_id,
                 scope=request.scope,
                 write_mode=request.write_mode,
@@ -1144,7 +1155,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_verify(request: CtxVerifyRequest):
         ops = _get_ops()
         try:
-            result = ops.verify(Path(request.project).resolve(), strict=request.strict)
+            result = ops.verify(safe_project_path(request.project), strict=request.strict)
         except Exception as exc:
             _ctx_exc(exc)
         return CtxVerifyResponse(result=result.result, is_pass=result.is_pass)
@@ -1153,7 +1164,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_status(request: CtxStatusRequest):
         ops = _get_ops()
         try:
-            result = ops.status(Path(request.project).resolve(), strict=request.strict)
+            result = ops.status(safe_project_path(request.project), strict=request.strict)
         except Exception as exc:
             _ctx_exc(exc)
         return CtxStatusResponse(
@@ -1168,7 +1179,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         ops = _get_ops()
         try:
             result = ops.clean(
-                Path(request.project).resolve(),
+                safe_project_path(request.project),
                 run_id=request.run_id,
                 keep_runs=request.keep_runs,
             )
@@ -1184,7 +1195,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_public_docs_impact(request: CtxPublicDocsImpactRequest):
         ops = _get_ops()
         try:
-            result = ops.public_docs_impact(Path(request.project).resolve(), scope=request.scope)
+            result = ops.public_docs_impact(safe_project_path(request.project), scope=request.scope)
         except Exception as exc:
             _ctx_exc(exc)
         return CtxPublicDocsImpactResponse(entries=result.entries or [])
@@ -1194,7 +1205,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         ops = _get_ops()
         try:
             path = ops.public_docs_update(
-                Path(request.project).resolve(),
+                safe_project_path(request.project),
                 scope=request.scope,
                 write_mode=request.write_mode,
             )
@@ -1208,6 +1219,11 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         import asyncio
         import json
 
+        try:
+            run_id = safe_run_id(run_id)
+        except ValueError:
+            await websocket.close(code=1008, reason="Invalid run id")
+            return
         await websocket.accept()
         record = run_executor.get(run_id)
         if record is None:

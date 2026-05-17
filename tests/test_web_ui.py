@@ -436,7 +436,8 @@ class TestStructuredErrors:
         assert response.status_code == 400
         data = response.json()
         assert data["type"] == "ValueError"
-        assert "bad path" in data["message"]
+        assert data["message"] == "Context operation failed."
+        assert "bad path" not in data["message"]
         assert "category" in data
         assert "next_action" in data
         assert "troubleshooting_section" in data
@@ -449,7 +450,8 @@ class TestStructuredErrors:
         assert response.status_code == 500
         data = response.json()
         assert data["type"] == "RuntimeError"
-        assert "registry corrupt" in data["message"]
+        assert "registry corrupt" not in data["message"]
+        assert data["machine_code"]
         assert "category" in data
         assert "next_action" in data
         assert "troubleshooting_section" in data

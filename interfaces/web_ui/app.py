@@ -24,6 +24,9 @@ from core.public_api import (
     interface_policy_config,
     list_run_views,
     list_workflows as cap_list_workflows,
+    safe_child_path,
+    safe_project_path,
+    safe_run_id,
 )
 from interfaces.common.run_views import run_status_payload
 from memory.bus import MemoryBus
@@ -221,12 +224,21 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         try:
             return await call_next(request)
         except Exception as exc:
-            from core.public_api import catalog_entry_for, format_api_response
+            from core.public_api import catalog_entry_for
 
             entry = catalog_entry_for(exc)
             return JSONResponse(
                 status_code=entry.http_status,
-                content=format_api_response(entry, exc),
+                content={
+                    "type": type(exc).__name__,
+                    "error": entry.category,
+                    "category": entry.category,
+                    "message": entry.human_message,
+                    "machine_code": entry.machine_code,
+                    "next_action": entry.next_actions[0] if entry.next_actions else None,
+                    "next_actions": entry.next_actions,
+                    "troubleshooting_section": "unexpected_error",
+                },
             )
 
     tool_registry = ToolRegistry(repo_root)
@@ -451,8 +463,8 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def provider_profiles() -> dict[str, Any]:
         try:
             document = load_profiles_document()
-        except Exception as exc:
-            return {"configured": False, "error": str(exc), "profiles": []}
+        except Exception:
+            return {"configured": False, "error": "Provider profiles are not configured.", "profiles": []}
         return {
             "configured": True,
             "default_profile": document.default_profile,
@@ -496,11 +508,12 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     @app.get("/api/runs/{run_id}", response_model=CanonicalRunSummary)
     def get_run_status(run_id: str) -> CanonicalRunSummary:
         """Get the status of a run."""
+        run_id = safe_run_id(run_id)
         record = run_executor.get(run_id)
         if record is not None:
             return run_status_payload(repo_root, run_id, record)
 
-        run_dir = repo_root / ".ai-team" / "runs" / run_id
+        run_dir = safe_child_path(repo_root, ".ai-team", "runs", run_id)
         if not run_dir.exists():
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
@@ -512,6 +525,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         import asyncio
         import json
 
+        run_id = safe_run_id(run_id)
         record = run_executor.get(run_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
@@ -553,6 +567,8 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
     def _ctx_exc(exc: Exception):
         summary = error_summary(exc)
+        summary["message"] = "Context operation failed."
+        summary["detail"] = "Context operation failed. Check the server logs for details."
         status_code = 500
         if isinstance(exc, ValueError):
             status_code = 400
@@ -564,7 +580,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_init(body: CtxInitRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            ops.init(Path(body.project_path))
+            ops.init(safe_project_path(body.project_path))
             return {"ok": True}
         except Exception as exc:
             return _ctx_exc(exc)
@@ -573,7 +589,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_scan(body: CtxScanRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            inventory = ops.scan(Path(body.project_path))
+            inventory = ops.scan(safe_project_path(body.project_path))
             return {"repo_root": inventory.repo_root, "head_commit": inventory.head_commit}
         except Exception as exc:
             return _ctx_exc(exc)
@@ -583,7 +599,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         try:
             ops = AictxContextOps(aictx_config)
             report = ops.run_pipeline(
-                repo_root=Path(body.project_path),
+                repo_root=safe_project_path(body.project_path),
                 run_id="webui-ctx",
                 scope=body.scope,
                 write_mode=body.write_mode,
@@ -601,7 +617,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_verify(body: CtxVerifyRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            result = ops.verify(Path(body.project_path), strict=body.strict)
+            result = ops.verify(safe_project_path(body.project_path), strict=body.strict)
             return {"result": result.result, "is_pass": result.is_pass}
         except Exception as exc:
             return _ctx_exc(exc)
@@ -610,7 +626,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_status(body: CtxStatusRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            st = ops.status(Path(body.project_path), strict=body.strict)
+            st = ops.status(safe_project_path(body.project_path), strict=body.strict)
             return {
                 "is_stale": st.is_stale,
                 "stale_sources": st.stale_sources,
@@ -627,7 +643,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_clean(body: CtxCleanRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            result = ops.clean(Path(body.project_path), run_id=body.run_id, keep_runs=body.keep_runs)
+            result = ops.clean(safe_project_path(body.project_path), run_id=body.run_id, keep_runs=body.keep_runs)
             return {
                 "removed_count": result.removed_count,
                 "kept_count": result.kept_count,
@@ -640,7 +656,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
     def ctx_public_docs_impact(body: CtxPublicDocsImpactRequest) -> dict[str, Any]:
         try:
             ops = AictxContextOps(aictx_config)
-            report = ops.public_docs_impact(Path(body.project_path), scope=body.scope)
+            report = ops.public_docs_impact(safe_project_path(body.project_path), scope=body.scope)
             return {"entries": report.entries}
         except Exception as exc:
             return _ctx_exc(exc)
@@ -650,7 +666,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         try:
             ops = AictxContextOps(aictx_config)
             patch_path = ops.public_docs_update(
-                Path(body.project_path),
+                safe_project_path(body.project_path),
                 scope=body.scope,
                 write_mode=body.write_mode,
             )
@@ -663,6 +679,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         """Stream run status updates via WebSocket."""
         import asyncio
 
+        run_id = safe_run_id(run_id)
         await websocket.accept()
         record = run_executor.get(run_id)
         if record is None:

@@ -180,6 +180,9 @@ PHASE_LOCK_EXEMPTIONS = {
     # profile exists. Keep this narrow so broader API drift still trips Phase 0.
     0: {
         'interfaces/api_server/': {'interfaces/api_server/app.py'},
+        # V1 security-hotfix: sanitize run/project paths and error payloads
+        # without opening the wider Web UI subsystem for unrelated edits.
+        'interfaces/web_ui/': {'interfaces/web_ui/app.py'},
     },
 }
 
