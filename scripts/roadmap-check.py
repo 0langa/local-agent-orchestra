@@ -183,11 +183,18 @@ RESERVED_SUBSYSTEMS = [
 SUBPROCESS_EXEMPTIONS = [
     'scripts/roadmap-check.py',              # This checker script
     'scripts/check-agent-instructions.py',   # Instruction linting script
+    'scripts/docs_check.py',                 # Release docs gate invokes the local CLI
+    'scripts/install_git_hooks.py',          # Developer hook installer invokes git config
+    'scripts/package_smoke.py',              # Clean install smoke creates/runs subprocess venvs
+    'scripts/refresh_kimi_memory.py',        # Maintainer-only memory refresh invokes git/kimi CLI
     'scripts/live_validate.py',              # Live validation harness shells out by design
     'tools/shell',                           # Shell tool (subprocess is its purpose)
     'tools/git',                             # Git tool (wraps git CLI)
     'core/repo/scanner.py',                  # Repo scanner uses git subprocess for snapshot
+    'interfaces/integration_checks.py',      # Diagnostic GitHub auth probe invokes gh status
     'tests/test_adapters.py',                # Adapter tests mock subprocess boundaries
+    'tests/test_integration_hardening.py',   # Integration diagnostics tests mock gh subprocess
+    'tests/test_packaging.py',               # Packaging tests build wheel/sdist in subprocesses
     'tests/tools/test_git_tool.py',          # GitTool tests create synthetic repos
     'tests/memory/test_stress.py',           # Cross-process stress tests spawn subprocesses
     'interfaces/cli/cli.py',                 # Doctor command checks git availability via subprocess

@@ -199,11 +199,18 @@ class TestCliUseOutput:
         env = _env(tmp_path)
         preset = MagicMock()
         preset.validate_inputs.return_value = {"task": "Fix bug", "repo": str(tmp_path)}
+        view = RunView(
+            run_id="run-use",
+            status="completed",
+            summary="Done",
+            artifact_dir=str(tmp_path / ".ai-team" / "runs" / "run-use"),
+            next_actions=["agentheim runs show run-use"],
+        )
         with patch("interfaces.cli.product_commands.PRESET_REGISTRY.get", return_value=preset), patch(
             "interfaces.cli.product_commands.CATALOG.get", return_value=_catalog_item("codebase-assistant")
         ), patch(
-            "interfaces.cli.product_commands._RUN_EXECUTOR.submit", return_value="run-use"
-        ), patch("interfaces.cli.product_commands._RUN_EXECUTOR.get", return_value=_record()):
+            "interfaces.cli.product_commands._run_preset_sync", return_value=view
+        ):
             result = runner.invoke(
                 app,
                 ["use", "code", "--input", "task=Fix bug", "--repo", str(tmp_path), "--yes"],
@@ -219,11 +226,18 @@ class TestCliUseOutput:
         env = _env(tmp_path)
         preset = MagicMock()
         preset.validate_inputs.return_value = {"task": "Fix bug", "repo": str(tmp_path)}
+        view = RunView(
+            run_id="run-use-json",
+            status="completed",
+            summary="Done",
+            artifact_dir=str(tmp_path / ".ai-team" / "runs" / "run-use-json"),
+            next_actions=["agentheim runs show run-use-json"],
+        )
         with patch("interfaces.cli.product_commands.PRESET_REGISTRY.get", return_value=preset), patch(
             "interfaces.cli.product_commands.CATALOG.get", return_value=_catalog_item("codebase-assistant")
         ), patch(
-            "interfaces.cli.product_commands._RUN_EXECUTOR.submit", return_value="run-use-json"
-        ), patch("interfaces.cli.product_commands._RUN_EXECUTOR.get", return_value=_record()):
+            "interfaces.cli.product_commands._run_preset_sync", return_value=view
+        ):
             result = runner.invoke(
                 app,
                 ["use", "code", "--input", "task=Fix bug", "--repo", str(tmp_path), "--json", "--yes"],
@@ -283,9 +297,7 @@ class TestWatchBehavior:
         with patch("interfaces.cli.product_commands.PRESET_REGISTRY.get", return_value=preset), patch(
             "interfaces.cli.product_commands.CATALOG.get", return_value=_catalog_item("codebase-assistant")
         ), patch(
-            "interfaces.cli.product_commands._RUN_EXECUTOR.submit", return_value="run-use-watch"
-        ), patch("interfaces.cli.product_commands._RUN_EXECUTOR.get", return_value=record), patch(
-            "interfaces.cli.product_commands.build_run_view", return_value=view
+            "interfaces.cli.product_commands._run_preset_sync", return_value=view
         ):
             result = runner.invoke(
                 app,

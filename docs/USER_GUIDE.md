@@ -115,10 +115,10 @@ The quickest way is `use`, which maps a plain-language goal to the right preset:
 agentheim use code --input repo=. --input task="Review the auth module"
 
 # Chat with your documents
-agentheim use docs-chat --input repo=. --input task="How does routing work?"
+agentheim use docs-chat --input repo=. --input query="How does routing work?"
 
 # Generate a shell command
-agentheim use command --input task="List all Python files modified in the last week"
+agentheim use command --input command_description="List all Python files modified in the last week"
 ```
 
 Or use the interactive picker:
@@ -220,13 +220,13 @@ The preset inspects the repo, plans the work, applies patches, runs tests, and p
 ### Ask questions over your documents
 
 ```bash
-agentheim use docs-chat --input repo=./my-docs --input task="What is the refund policy?"
+agentheim use docs-chat --input repo=./my-docs --input query="What is the refund policy?"
 ```
 
 Or run directly:
 
 ```bash
-agentheim start local-document-chat --input repo=./my-docs --input task="Summarize the onboarding guide"
+agentheim start local-document-chat --input repo=./my-docs --input query="Summarize the onboarding guide"
 ```
 
 Documents are indexed locally. Nothing is sent to the provider except your question and the retrieved context chunks.

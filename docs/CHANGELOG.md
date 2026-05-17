@@ -8,6 +8,8 @@
 ### V1 Release
 - Version bumped to `1.0.0` in `pyproject.toml`.
 - API server and web UI now use dynamic package version with `1.0.0` fallback.
+- Live release acceptance passed on a configured Azure Foundry release profile using `gpt-4.1`: 18/18 live matrix checks covering provider health, all presets, report/resume, and safety-negative paths.
+- Live standalone tool and vision smoke passed: filesystem, memory, shell, git, local DB, HTTP, browser, web research fail-closed, MCP fail-closed, and configured vision.
 - Completed all 12 V1 roadmap phases: CLI surface, workflow engine, provider lanes,
   API/web parity, runs/artifacts/recovery, integration hardening, packaging,
   CI/security, safety/privacy, documentation, architecture cleanup, and release prep.
@@ -39,12 +41,12 @@
 - Updated `BASELINE-ROADMAP.md`, `SUPPORT_MATRIX.md`, `live-ai-testing.md` with Lane 3 real endpoint evidence.
 
 ### Cleanup — Remove Temporary Gemini API Key Profile
-- Deleted `gemini-key-test` provider profile from local `providers.json` and removed `secret://provider/gemini-key-test/api_key` from the OS keychain.
-- Replaced all `gemini-key-test` profile name references in docs with generic "a temporary Gemini API key" language.
+- Deleted a temporary Gemini API key provider profile from local `providers.json` and removed its OS keychain secret.
+- Replaced temporary Gemini profile name references in docs with generic "a temporary Gemini API key" language.
 - Updated `BASELINE-ROADMAP.md`, `SUPPORT_MATRIX.md`, `TIER1_CONTRACTS.md`, `live-ai-testing.md`, and `CHANGELOG.md` to note the deletion and direct future testing to a Gemini API profile (free tier).
 
 ### Provider Stability Sweep — Azure Foundry and Gemini API
-- Promoted Azure Foundry/OpenAI-compatible provider compatibility evidence: `azure-real` / `gpt-5.4` passed doctor, ping-models, planner/executor/verifier provider tests, `command-assistant`, and direct PNG vision smoke.
+- Promoted Azure Foundry/OpenAI-compatible provider compatibility evidence: a configured Azure Foundry profile / `gpt-5.4` passed doctor, ping-models, planner/executor/verifier provider tests, `command-assistant`, and direct PNG vision smoke.
 - Promoted Gemini API compatibility evidence: a temporary Gemini API key / `gemini-2.5-flash` passed provider smoke, text/JSON, direct PNG vision smoke, `command-assistant`, `local-document-chat`, `context-maintainer`, `file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`, and `research-report` without 429s.
 - Fixed documents workflow provider map to use the shared provider registry so Gemini/Vertex-compatible providers can run `local-document-chat`.
 - Disabled Typer local-variable tracebacks in the CLI to avoid raw provider secret exposure in failure artifacts.
@@ -54,9 +56,9 @@
 - Updated README/DEV_TESTING/support/live evidence test counts to 1256 collected, 1220 selected, 36 deselected from the baseline gate.
 
 ### Azure `gpt-5.4` Live Rerun — Documents/Research Pass, Codebase Blocked
-- Updated the local `azure-real` provider profile from `gpt-5.4-mini` to deployed `gpt-5.4` for all roles.
-- Ran `scripts/live_validate.py --profile azure-real --only local-document-chat,codebase-assistant,research-report --max-attempts 2` against a clean clone of the test repo.
-- `local-document-chat` passed on `azure-real` / `gpt-5.4`; `research-report` passed after aligning live-runner expectations with `ResearchReport(...)` output; `codebase-assistant` still returned `status='blocked'` after verifier pytest failed on the generated boolean-exclusion test.
+- Updated the local Azure Foundry provider profile from `gpt-5.4-mini` to deployed `gpt-5.4` for all roles.
+- Ran `scripts/live_validate.py --profile <azure-profile> --only local-document-chat,codebase-assistant,research-report --max-attempts 2` against a clean clone of the test repo.
+- `local-document-chat` passed on the Azure Foundry profile / `gpt-5.4`; `research-report` passed after aligning live-runner expectations with `ResearchReport(...)` output; `codebase-assistant` still returned `status='blocked'` after verifier pytest failed on the generated boolean-exclusion test.
 - Hardened research report parsing for object-shaped `executive_summary` and `recommendations`, and raised structured-output caps for research summarization and coding planning to avoid truncated JSON on capable-model runs.
 - Updated `live-ai-testing.md`, `docs/SUPPORT_MATRIX.md`, `docs/TIER1_CONTRACTS.md`, and `BASELINE-ROADMAP.md` with exact capable-model evidence and remaining work.
 
@@ -173,12 +175,12 @@
   - `invalid-role`: `provider test --role nonexistent-role` → rejected cleanly
   - `invalid-profile`: `provider test --profile nonexistent-profile` → rejected cleanly
   - `copy-denied`: `copy` outside workspace without approval → `Aborted`
-- All 3 safety-negative tests pass against `azure-real`.
+- All 3 safety-negative tests pass against the configured Azure Foundry profile.
 - Updated `live-ai-testing.md`, `BASELINE-ROADMAP.md` with safety-negative evidence.
 - Validation: safety-negative subset pass; existing doctor/command-assistant/report subset still pass.
 
 ### Phase 2/6 Slice — Full Live Validation Matrix + Report/Resume Closure
-- Ran `scripts/live_validate.py --profile azure-real` full matrix (15 checks).
+- Ran `scripts/live_validate.py --profile <azure-profile>` full matrix (15 checks).
 - Results: 11 pass, 4 fail. New passes: `file-organizer-dry-run`, `docs-maintainer-plan`, `github-maintainer`, `resume-command-assistant`.
 - Fixed `report-command-assistant` `must_contain` pattern in runner matrix (`Status: done` → `"status": "completed"` to match JSON output).
 - Re-ran `report-command-assistant` → pass.
@@ -188,7 +190,7 @@
 - Validation: runner exit code 1 (4 known failures); evidence JSONL verified; report fix re-run pass.
 
 ### Phase 4 Slice — Stable Preset Live Promotion Evidence
-- Ran `scripts/live_validate.py --profile azure-real --only local-document-chat,codebase-assistant,context-maintainer`.
+- Ran `scripts/live_validate.py --profile <azure-profile> --only local-document-chat,codebase-assistant,context-maintainer`.
 - `context-maintainer` passed (2.2s). `local-document-chat` and `codebase-assistant` returned `status='failed'` against test repo.
 - Updated `live-ai-testing.md` with stable preset evidence table.
 - Updated `docs/SUPPORT_MATRIX.md` stable candidate rows with honest fresh evidence.
@@ -196,8 +198,8 @@
 - Validation: runner exit code 1 (2 failed, 1 passed); evidence JSONL verified.
 
 ### Phase 2 Slice — Azure Foundry Live Lane Evidence
-- Ran `scripts/live_validate.py --profile azure-real --only doctor,ping-models,provider-planner,provider-executor,provider-verifier,command-assistant`.
-- All 6 checks passed against `azure-real` profile (`azure_foundry` provider, `gpt-5.4-mini` model).
+- Ran `scripts/live_validate.py --profile <azure-profile> --only doctor,ping-models,provider-planner,provider-executor,provider-verifier,command-assistant`.
+- All 6 checks passed against an Azure Foundry profile (`azure_foundry` provider, `gpt-5.4-mini` model).
 - Updated `live-ai-testing.md` with structured fresh evidence table.
 - Updated `docs/SUPPORT_MATRIX.md` OpenAI-compatible lane and `azure_foundry` adapter rows.
 - Updated `BASELINE-ROADMAP.md` Phase 2 status to reflect Lane 1 fresh evidence.

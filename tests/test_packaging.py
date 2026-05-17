@@ -31,14 +31,16 @@ class TestPyprojectMetadata:
         pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
         data = tomllib.loads(pyproject)
         classifiers = data["project"]["classifiers"]
+        assert "Development Status :: 5 - Production/Stable" in classifiers
         assert any("End Users" in c for c in classifiers)
         assert any("Developers" in c for c in classifiers)
 
     def test_spdx_license_metadata(self) -> None:
         pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
         data = tomllib.loads(pyproject)
-        license_data = data["project"].get("license", {})
-        assert "MIT" in license_data.get("text", "")
+        assert data["project"].get("license") == "MIT"
+        assert data["project"].get("license-files") == ["LICENSE"]
+        assert not any("License :: OSI Approved" in c for c in data["project"]["classifiers"])
 
     def test_runtime_dependencies_are_bounded(self) -> None:
         pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
@@ -46,6 +48,14 @@ class TestPyprojectMetadata:
         deps = data["project"]["dependencies"]
         for dep in deps:
             assert "," in dep, f"Dependency '{dep}' should have an upper bound"
+
+    def test_optional_dependencies_are_bounded(self) -> None:
+        pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+        data = tomllib.loads(pyproject)
+        extras = data["project"]["optional-dependencies"]
+        for extra, deps in extras.items():
+            for dep in deps:
+                assert "," in dep, f"Optional dependency '{dep}' in extra '{extra}' should have an upper bound"
 
     def test_extras_defined(self) -> None:
         pyproject = Path("pyproject.toml").read_text(encoding="utf-8")

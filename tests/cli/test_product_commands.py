@@ -46,6 +46,15 @@ def test_setup_registers_under_root_help() -> None:
     assert "setup" in result.output
 
 
+def test_commands_json_has_no_empty_beginner_group() -> None:
+    result = runner.invoke(app, ["commands", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    commands = [item["command"] for section in payload["sections"] for item in section["commands"]]
+    assert "" not in commands
+    assert {"setup", "status", "use", "open", "runs"}.issubset(set(commands))
+
+
 def test_setup_supports_each_beginner_provider(tmp_path: Path) -> None:
     providers = {
         "openai-compatible": ["--endpoint", "https://example.test/v1", "--api-key", "sk-test"],
@@ -73,14 +82,17 @@ def test_setup_supports_each_beginner_provider(tmp_path: Path) -> None:
 
 def test_setup_dry_run_writes_nothing(tmp_path: Path) -> None:
     env = _env(tmp_path)
-    with patch("interfaces.cli.product_commands.build_readiness_state", return_value=_ready_state()):
-        result = runner.invoke(
-            app,
-            ["setup", "--provider", "openai", "--model", "gpt-test", "--api-key", "secret", "--yes", "--dry-run"],
-            env=env,
-        )
+    result = runner.invoke(
+        app,
+        ["setup", "--provider", "openai", "--model", "gpt-test", "--api-key", "secret", "--yes", "--dry-run", "--json"],
+        env=env,
+    )
     assert result.exit_code == 0, result.output
     assert not (Path(env["AGENTHEIM_CONFIG_DIR"]) / "providers.json").exists()
+    payload = json.loads(result.output)
+    assert payload["readiness"]["profile_name"] == "default"
+    assert payload["readiness"]["configured_providers"][0]["provider_id"] == "openai"
+    assert payload["readiness"]["lane"] == "DRY-RUN"
 
 
 def test_setup_stores_secret_in_existing_secret_store(tmp_path: Path) -> None:

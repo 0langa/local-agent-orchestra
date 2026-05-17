@@ -120,14 +120,15 @@ def _collect_command_entries(typer_app: typer.Typer, prefix: str = "", inherited
             continue
         group_panel = _normalize_panel(getattr(group_info, "rich_help_panel", None) or inherited_panel)
         group_command = f"{prefix} {name}".strip()
-        entries.append(
-            _CommandEntry(
-                command=group_command,
-                description=_command_help_text(group_info),
-                panel=group_panel,
-                kind="group",
+        if group_command:
+            entries.append(
+                _CommandEntry(
+                    command=group_command,
+                    description=_command_help_text(group_info),
+                    panel=group_panel,
+                    kind="group",
+                )
             )
-        )
         nested = getattr(group_info, "typer_instance", None)
         if nested is not None:
             entries.extend(_collect_command_entries(nested, prefix=group_command, inherited_panel=group_panel))

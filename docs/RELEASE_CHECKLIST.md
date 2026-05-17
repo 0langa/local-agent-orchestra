@@ -13,6 +13,10 @@ Use this checklist before publishing a new Agentheim release.
   - [ ] `python -m interfaces.cli.cli --help`
   - [ ] `python -m interfaces.cli.cli commands --json`
   - [ ] `python scripts/docs_check.py`
+- [ ] Live AI acceptance passes against a configured release profile:
+  - [ ] `python scripts/live_validate.py --profile <profile> --max-attempts 1 --delay-between-tests 1`
+- [ ] Live tool and vision smoke passes against the same configured profile:
+  - [ ] `python scripts/live_tool_smoke.py`
 - [ ] Package builds:
   - [ ] `python -m build` produces wheel and sdist
   - [ ] `twine check dist/*` passes

@@ -25,7 +25,7 @@ class HttpTool(BaseTool):
     """
 
     def __init__(self, network_policy: NetworkPolicy | None = None) -> None:
-        self._enforcer = NetworkEnforcer(network_policy or NetworkPolicy())
+        self._enforcer = NetworkEnforcer(network_policy or NetworkPolicy(allowed=True))
         schema = ToolSchema(
             description="Make outbound HTTP requests with host-level network policy.",
             parameters={

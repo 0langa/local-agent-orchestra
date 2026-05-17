@@ -38,13 +38,13 @@ def test_provider_test_uses_resolved_default_profile(tmp_path: Path, monkeypatch
         json.dumps(
             {
                 "version": 1,
-                "default_profile": "azure-real",
+                "default_profile": "azure-fixture",
                 "profiles": {
-                    "azure-real": {
-                        "name": "azure-real",
+                    "azure-fixture": {
+                        "name": "azure-fixture",
                         "providers": {
-                            "azure-real": {
-                                "id": "azure-real",
+                            "azure-fixture": {
+                                "id": "azure-fixture",
                                 "kind": "openai_compatible",
                                 "endpoint": "https://example.test/v1",
                                 "auth_mode": "none",
@@ -57,7 +57,7 @@ def test_provider_test_uses_resolved_default_profile(tmp_path: Path, monkeypatch
                             "planner": {
                                 "id": "planner",
                                 "role": "planner",
-                                "provider": "azure-real",
+                                "provider": "azure-fixture",
                                 "model": "gpt-test",
                                 "capabilities": ["text", "json"],
                             }
@@ -73,11 +73,12 @@ def test_provider_test_uses_resolved_default_profile(tmp_path: Path, monkeypatch
         content = "pong"
 
     monkeypatch.setenv("AGENTHEIM_CONFIG_DIR", str(config_dir))
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("providers.openai_v1.OpenAIV1Provider.invoke", lambda self, request: _Resp())
 
     result = runner.invoke(app, ["provider", "test", "--role", "planner"])
     assert result.exit_code == 0
-    assert '"profile": "azure-real"' in result.output
+    assert '"profile": "azure-fixture"' in result.output
 
 
 def test_mcp_list_missing_config_exits_zero(tmp_path: Path) -> None:

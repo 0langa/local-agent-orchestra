@@ -14,7 +14,7 @@ Records structured evidence for each check:
 
 Usage:
     python scripts/live_validate.py --repo-root . --test-repo .localtest/test-repo
-    python scripts/live_validate.py --only doctor,ping-models --profile azure-real
+    python scripts/live_validate.py --only doctor,ping-models --profile <profile>
     powershell -ExecutionPolicy Bypass -File .\devtest\live_validate.ps1
 """
 from __future__ import annotations

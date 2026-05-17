@@ -5,9 +5,11 @@ import os
 import threading
 import time
 import webbrowser
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import typer
 from rich.console import Console
@@ -30,7 +32,7 @@ from core.public_api import ResumeOrchestrator, ToolRegistry, WorkflowRunner, Po
 from interfaces.run_hooks import register_default_run_hooks
 from presets.base import PRESET_REGISTRY, PresetInputError
 from presets.catalog import CATALOG, PresetCatalogItem, QuestionSchema
-from interfaces.readiness import ReadinessState, build_readiness_state
+from interfaces.readiness import ProviderReadiness, ReadinessState, ReadinessStatus, build_readiness_state
 
 
 product_app = typer.Typer(help="Beginner product commands.")
@@ -196,6 +198,40 @@ def _render_text_result(payload: dict[str, Any], readiness: ReadinessState) -> N
     console.print(f"readiness: {readiness.status.value}")
     for action in payload["next_actions"]:
         console.print(action)
+
+
+def _dry_run_readiness(plan: SetupPlan, privacy_mode: str, needs_secret: bool) -> ReadinessState:
+    provider_status = ReadinessStatus.ready
+    detail = "planned provider configuration; not written"
+    next_actions = ["Run the same command without --dry-run to write the provider profile."]
+    if needs_secret and not plan.store_secret:
+        provider_status = ReadinessStatus.needs_secret
+        detail = "planned provider requires an API key; no --api-key was provided"
+        next_actions.insert(0, "Pass --api-key or run setup interactively.")
+
+    return ReadinessState(
+        status=provider_status,
+        profile_name=plan.profile,
+        model_count=len(_CORE_ROLES) + len(_RECOMMENDED_PRESET_ROLES),
+        configured_providers=[
+            ProviderReadiness(
+                provider_id=plan.provider_id,
+                provider_type=plan.template,
+                endpoint=plan.endpoint,
+                status=provider_status,
+                detail=detail,
+            )
+        ],
+        next_actions=next_actions,
+        detail=detail,
+        lane="DRY-RUN",
+        lane_detail="configuration preview only",
+        local_reachability_ok=True,
+        local_reachability_detail="not checked in dry-run mode",
+        model_connectivity_ok=None,
+        model_connectivity_detail="not checked in dry-run mode",
+        privacy_mode=privacy_mode,
+    )
 
 
 def _recent_runs(repo_root: Path) -> list[RunView]:
@@ -424,6 +460,56 @@ def _resume_run(repo_root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
+def _extract_persisted_run_id(result: Any) -> str | None:
+    if isinstance(result, tuple) and len(result) == 2:
+        report, ledger_dir = result
+        if hasattr(report, "run_id") and getattr(report, "run_id"):
+            return str(getattr(report, "run_id"))
+        if isinstance(ledger_dir, Path):
+            return ledger_dir.name
+    if hasattr(result, "run_id") and getattr(result, "run_id"):
+        return str(getattr(result, "run_id"))
+    if isinstance(result, dict) and result.get("run_id"):
+        return str(result["run_id"])
+    return None
+
+
+def _ensure_minimal_run_dir(repo_root: Path, run_id: str, preset_id: str, status: str, result: Any = None) -> None:
+    run_dir = repo_root / ".ai-team" / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    run_json = run_dir / "run.json"
+    if not run_json.exists():
+        run_json.write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "preset_id": preset_id,
+                    "status": status,
+                    "repo_root": str(repo_root),
+                    "created_at": datetime.now(tz=UTC).isoformat(),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    if result is not None and not (run_dir / "final_report.json").exists():
+        serializable = result.model_dump(mode="json") if hasattr(result, "model_dump") else result
+        try:
+            json.dumps(serializable)
+        except TypeError:
+            serializable = {"result": str(result)}
+        if isinstance(serializable, dict):
+            serializable.setdefault("status", status)
+            (run_dir / "final_report.json").write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+
+
+def _run_preset_sync(preset: Any, preset_id: str, inputs: dict[str, Any], repo_root: Path) -> RunView:
+    result = preset.run(inputs)
+    run_id = _extract_persisted_run_id(result) or str(uuid4())
+    _ensure_minimal_run_dir(repo_root, run_id, preset_id, "completed", result)
+    return build_run_view(repo_root, run_id)
+
+
 @product_app.command("setup", rich_help_panel="Getting Started")
 def setup_cmd(
     provider: str | None = typer.Option(None, "--provider", help="Beginner provider choice."),
@@ -492,7 +578,7 @@ def setup_cmd(
         document.default_profile = profile
         save_profiles_document(document)
 
-    readiness = build_readiness_state(skip_connectivity=dry_run)
+    readiness = _dry_run_readiness(plan, privacy_mode, needs_secret) if dry_run else build_readiness_state(profile=profile)
     payload = {
         "status": "dry-run" if dry_run else "ok",
         "profile": profile,
@@ -573,22 +659,8 @@ def use_cmd(
     except PresetInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    run_id = _RUN_EXECUTOR.submit(preset.run, validated_inputs)
     repo_root = repo.resolve()
-
-    if watch:
-        view = _watch_run(run_id, repo_root)
-    else:
-        try:
-            view = build_run_view(repo_root, run_id)
-        except Exception:
-            view = RunView(
-                run_id=run_id,
-                status="pending",
-                summary="Run submitted",
-                artifact_dir=str(repo_root / ".ai-team" / "runs" / run_id),
-                next_actions=[f"agentheim runs show {run_id}"],
-            )
+    view = _run_preset_sync(preset, item.preset_id, validated_inputs, repo_root)
 
     payload = view.model_dump(mode="json")
     payload["task_id"] = selected_task_id

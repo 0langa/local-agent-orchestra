@@ -76,6 +76,22 @@ class TestHttpToolSuccess:
 
 
 class TestHttpToolPolicyDenial:
+    def test_default_tool_allows_network_when_context_allows(self, allowed_context: ToolContext) -> None:
+        tool = HttpTool()
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.headers = {}
+            mock_response.read.return_value = b"hello"
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            result = tool.invoke(
+                {"method": "GET", "url": "https://1.1.1.1"},
+                allowed_context,
+            )
+
+        assert result.success is True
+
     def test_network_policy_denies_private_ip(self, allowed_context: ToolContext) -> None:
         tool = HttpTool(
             network_policy=NetworkPolicy(

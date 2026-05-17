@@ -6,6 +6,8 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import shutil
+import os
 from pathlib import Path
 
 
@@ -20,7 +22,14 @@ def main() -> int:
 
     # 1. Build wheel and sdist
     print("==> Building wheel and sdist")
-    result = run([sys.executable, "-m", "build", "--wheel", "--sdist"], cwd=repo_root)
+    dist = repo_root / "dist"
+    if dist.exists():
+        resolved_dist = dist.resolve()
+        if resolved_dist != repo_root / "dist":
+            errors.append(f"Refusing to remove unexpected dist path: {resolved_dist}")
+        else:
+            shutil.rmtree(resolved_dist)
+    result = run([sys.executable, "-m", "build", "--wheel", "--sdist"], cwd=repo_root, check=False)
     if result.returncode != 0:
         errors.append(f"build failed: {result.stderr}")
         print(result.stdout)
@@ -28,7 +37,6 @@ def main() -> int:
     else:
         print("Build OK")
 
-    dist = repo_root / "dist"
     wheels = list(dist.glob("*.whl"))
     sdists = list(dist.glob("*.tar.gz"))
     if not wheels:
@@ -54,6 +62,7 @@ def main() -> int:
 
         pip = venv_path / "Scripts" / "pip.exe" if sys.platform == "win32" else venv_path / "bin" / "pip"
         python = venv_path / "Scripts" / "python.exe" if sys.platform == "win32" else venv_path / "bin" / "python"
+        agentheim = venv_path / "Scripts" / "agentheim.exe" if sys.platform == "win32" else venv_path / "bin" / "agentheim"
 
         print("==> Installing wheel")
         result = run([str(pip), "install", str(wheel)])
@@ -65,12 +74,18 @@ def main() -> int:
             print("Install OK")
 
         # 3. Smoke commands
+        env = {
+            **os.environ,
+            "AGENTHEIM_CONFIG_DIR": str(Path(tmp) / "config"),
+            "AGENTHEIM_DATA_DIR": str(Path(tmp) / "data"),
+        }
         for cmd_name, args in (
             ("help", ["--help"]),
             ("status-json", ["status", "--json"]),
         ):
             print(f"==> Smoke: agentheim {' '.join(args)}")
-            result = run([str(python), "-m", "interfaces.cli.cli", *args], cwd=repo_root, check=False)
+            smoke_cmd = [str(agentheim), *args] if agentheim.exists() else [str(python), "-m", "interfaces.cli.cli", *args]
+            result = subprocess.run(smoke_cmd, cwd=tmp, check=False, capture_output=True, text=True, env=env)
             if result.returncode != 0:
                 errors.append(f"smoke {cmd_name} failed: {result.stderr}")
                 print(result.stdout)

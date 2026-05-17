@@ -100,7 +100,7 @@ agentheim provider profiles
 #### Inspect one profile in detail
 
 ```bash
-agentheim provider list --profile azure-real
+agentheim provider list --profile azure-prod
 ```
 
 #### Add a new profile
@@ -108,20 +108,20 @@ agentheim provider list --profile azure-real
 Profiles are created implicitly the first time you add a provider into a new profile name.
 
 ```bash
-agentheim provider add azure-real --template azure_foundry --model gpt-5.4 --role planner --profile azure-real --endpoint https://YOUR-RESOURCE.openai.azure.com/openai/v1
+agentheim provider add azure-prod --template azure_foundry --model gpt-5.4 --role planner --profile azure-prod --endpoint https://YOUR-RESOURCE.openai.azure.com/openai/v1
 ```
 
 Then add more role bindings as needed:
 
 ```bash
-agentheim provider assign generator --provider azure-real --model gpt-5.4 --profile azure-real
-agentheim provider assign reviewer --provider azure-real --model gpt-5.4 --profile azure-real
+agentheim provider assign generator --provider azure-prod --model gpt-5.4 --profile azure-prod
+agentheim provider assign reviewer --provider azure-prod --model gpt-5.4 --profile azure-prod
 ```
 
 Or switch all existing roles in that profile at once:
 
 ```bash
-agentheim provider assign-all --provider azure-real --model gpt-4.1 --profile azure-real
+agentheim provider assign-all --provider azure-prod --model gpt-4.1 --profile azure-prod
 ```
 
 #### Edit an existing profile
@@ -131,39 +131,39 @@ Common edit operations are command-based:
 - change the default active profile:
 
 ```bash
-agentheim provider use azure-real
+agentheim provider use azure-prod
 ```
 
 - change the project-local profile pointer:
 
 ```bash
-agentheim provider use azure-real --project
+agentheim provider use azure-prod --project
 ```
 
 - change one role binding:
 
 ```bash
-agentheim provider assign planner --provider azure-real --model gpt-4.1 --profile azure-real
+agentheim provider assign planner --provider azure-prod --model gpt-4.1 --profile azure-prod
 ```
 
 - change all current role bindings in a profile:
 
 ```bash
-agentheim provider assign-all --provider azure-real --model gpt-4.1 --profile azure-real
+agentheim provider assign-all --provider azure-prod --model gpt-4.1 --profile azure-prod
 ```
 
 - rotate the provider secret:
 
 ```bash
-agentheim provider rotate-secret azure-real --profile azure-real
+agentheim provider rotate-secret azure-prod --profile azure-prod
 ```
 
 - update endpoint, auth, headers, or timeout:
 
 ```bash
-agentheim provider update azure-real --profile azure-real --endpoint https://YOUR-RESOURCE.openai.azure.com/openai/v1 --timeout-seconds 90
-agentheim provider update azure-real --profile azure-real --header api-version=2025-04-01-preview
-agentheim provider update azure-real --profile azure-real --api-key NEW_SECRET_VALUE
+agentheim provider update azure-prod --profile azure-prod --endpoint https://YOUR-RESOURCE.openai.azure.com/openai/v1 --timeout-seconds 90
+agentheim provider update azure-prod --profile azure-prod --header api-version=2025-04-01-preview
+agentheim provider update azure-prod --profile azure-prod --api-key NEW_SECRET_VALUE
 ```
 
 #### Delete an existing profile
@@ -171,13 +171,13 @@ agentheim provider update azure-real --profile azure-real --api-key NEW_SECRET_V
 Delete an empty profile:
 
 ```bash
-agentheim provider delete-profile azure-real
+agentheim provider delete-profile azure-prod
 ```
 
 Force-delete a populated profile and remove its saved provider secrets:
 
 ```bash
-agentheim provider delete-profile azure-real --force
+agentheim provider delete-profile azure-prod --force
 ```
 
 ---
@@ -303,7 +303,7 @@ agentheim status --debug-bundle
 
 # Run a task by goal
 agentheim use code --input repo=. --input task="Refactor auth module"
-agentheim use docs-chat --input repo=. --input task="Explain the routing logic"
+agentheim use docs-chat --input repo=. --input query="Explain the routing logic"
 
 # Inspect a repo
 python -m interfaces.cli.cli inspect --repo .
@@ -318,8 +318,8 @@ python -m interfaces.cli.cli run "Refactor auth module" --repo . --mode apply
 python -m interfaces.cli.cli provider templates
 python -m interfaces.cli.cli provider profiles
 python -m interfaces.cli.cli provider add openai --template openai_v1 --model gpt-4o-mini --role planner
-python -m interfaces.cli.cli provider update azure-real --profile azure-real --timeout-seconds 90
-python -m interfaces.cli.cli provider assign-all --provider azure-real --model gpt-4.1 --profile azure-real
+python -m interfaces.cli.cli provider update azure-prod --profile azure-prod --timeout-seconds 90
+python -m interfaces.cli.cli provider assign-all --provider azure-prod --model gpt-4.1 --profile azure-prod
 python -m interfaces.cli.cli provider delete-profile scratch --force
 python -m interfaces.cli.cli provider test --role planner
 
