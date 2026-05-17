@@ -1,7 +1,8 @@
-"""FastAPI web UI prototype for agent orchestration."""
+"""FastAPI web UI for Agentheim local dashboard and API."""
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from core.public_api import (
     build_model_registry,
     error_summary,
     interface_policy_config,
+    list_run_views,
     list_workflows as cap_list_workflows,
 )
 from memory.bus import MemoryBus
@@ -30,6 +32,7 @@ from tools.registry import ToolRegistry, create_core_tool_registry
 from agentheim.context_ops_impl import AictxContextOps
 from agentheim.vendor.aictx.config import AictxConfig
 from agentheim.vendor.aictx.errors import SafetyError
+from interfaces.readiness import ReadinessState, build_readiness_state
 from interfaces.tool_approval import InterfaceApprovalStore
 from presets.base import PresetInputError
 from presets.catalog import CATALOG, QuestionSchema
@@ -41,7 +44,7 @@ from presets.catalog import CATALOG, QuestionSchema
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "0.1.0-prototype"
+    version: str = "0.1.0"
 
 
 class ToolListItem(BaseModel):
@@ -98,6 +101,21 @@ class PresetListItem(BaseModel):
     required_capabilities: list[str] = Field(default_factory=list)
     questions: list[QuestionSchema] = Field(default_factory=list)
     default_config: dict[str, Any] = Field(default_factory=dict)
+
+
+class HomeTaskGroup(BaseModel):
+    title: str
+    tasks: list[PresetListItem] = Field(default_factory=list)
+
+
+class HomeResponse(BaseModel):
+    readiness: ReadinessState
+    provider_cta: str
+    recommended_tasks: list[PresetListItem] = Field(default_factory=list)
+    advanced_tasks: list[PresetListItem] = Field(default_factory=list)
+    recent_runs: list[dict[str, Any]] = Field(default_factory=list)
+    optional_integrations: list[dict[str, Any]] = Field(default_factory=list)
+    version: str = "0.1.0"
 
 
 class ExecuteRequest(BaseModel):
@@ -186,10 +204,15 @@ class CtxPublicDocsUpdateRequest(BaseModel):
 def create_app(repo_root: str | Path = ".") -> FastAPI:
     """Create and configure the FastAPI application."""
     repo_root = Path(repo_root).resolve()
+    try:
+        app_version = package_version("agentheim")
+    except PackageNotFoundError:
+        app_version = "0.1.0"
+
     app = FastAPI(
         title="Agentheim",
-        description="Web UI prototype for agent orchestration",
-        version="0.1.0-prototype",
+        description="Local Agentheim dashboard and API",
+        version=app_version,
     )
 
     @app.middleware("http")
@@ -244,14 +267,47 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             return build_live_run_summary(repo_root, run_id, record)
         return build_run_summary(repo_root, run_id)
 
+    def _preset_item(preset_id: str) -> PresetListItem:
+        return PresetListItem(**CATALOG.get(preset_id).model_dump())
+
+    def _home_payload() -> HomeResponse:
+        readiness = build_readiness_state(skip_connectivity=True, check_optional_integrations=True)
+        recommended = [_preset_item(item.preset_id) for item in CATALOG.recommended()]
+        advanced = [_preset_item(item.preset_id) for item in CATALOG.advanced()]
+        recent_runs = [view.model_dump(mode="json") for view in list_run_views(repo_root)[:5]]
+        provider_cta = (
+            "Connect a provider in the CLI with `agentheim setup` to unlock guided tasks."
+            if readiness.status != "ready"
+            else "Provider is ready. Pick a recommended task to get started."
+        )
+        return HomeResponse(
+            readiness=readiness,
+            provider_cta=provider_cta,
+            recommended_tasks=recommended,
+            advanced_tasks=advanced,
+            recent_runs=recent_runs,
+            optional_integrations=[item.model_dump(mode="json") for item in readiness.optional_integrations],
+            version=app_version,
+        )
+
     @app.get("/", response_class=HTMLResponse)
     def root() -> str:
-        """Serve the prototype dashboard."""
-        return _dashboard_html()
+        """Serve the Agentheim dashboard."""
+        return _dashboard_html(app_version)
 
     @app.get("/api/health", response_model=HealthResponse)
     def health() -> HealthResponse:
-        return HealthResponse()
+        return HealthResponse(version=app_version)
+
+    @app.get("/api/status", response_model=HomeResponse)
+    def status() -> HomeResponse:
+        """Return product home screen data for the dashboard."""
+        return _home_payload()
+
+    @app.get("/api/tasks", response_model=list[PresetListItem])
+    def tasks() -> list[PresetListItem]:
+        """Return product-facing tasks for the home screen."""
+        return [_preset_item(item.preset_id) for item in CATALOG.list() if item.product_tier in {"recommended", "advanced"}]
 
     @app.get("/api/tools", response_model=list[ToolListItem])
     def list_tools() -> list[ToolListItem]:
@@ -657,8 +713,8 @@ def _import_workflows() -> None:
         pass
 
 
-def _dashboard_html() -> str:
-    return """<!DOCTYPE html>
+def _dashboard_html(app_version: str) -> str:
+    html = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -669,7 +725,7 @@ def _dashboard_html() -> str:
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
   h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
   .subtitle { color: #94a3b8; margin-bottom: 2rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }}
   .card { background: #1e293b; border-radius: 0.5rem; padding: 1.25rem; border: 1px solid #334155; }
   .card h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #60a5fa; }
   .card ul { list-style: none; }
@@ -705,6 +761,12 @@ def _dashboard_html() -> str:
   .run-failed { color: #f87171; }
   .run-artifacts { margin-top: 0.35rem; font-size: 0.75rem; }
   .run-error { margin-top: 0.35rem; font-size: 0.75rem; color: #f87171; }
+    .task-group { margin-top: 1rem; }
+    .task-group h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: #cbd5e1; }
+    .preset-question { display: block; margin-top: 0.4rem; font-size: 0.8rem; }
+    .preset-question input, .preset-question select { margin-top: 0.2rem; width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.35rem 0.45rem; border-radius: 0.25rem; }
+    .task-meta { font-size: 0.78rem; color: #94a3b8; margin-top: 0.3rem; }
+    .run-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -713,24 +775,29 @@ def _dashboard_html() -> str:
 <div id="status">Loading...</div>
 <div class="grid">
   <div class="card">
-    <h2>Tools</h2>
-    <ul id="tools-list"><li class="loading">Loading...</li></ul>
+        <h2>Readiness</h2>
+        <ul id="readiness-list"><li class="loading">Loading...</li></ul>
   </div>
   <div class="card">
-    <h2>Workflows</h2>
-    <ul id="workflows-list"><li class="loading">Loading...</li></ul>
+        <h2>Connect Provider</h2>
+        <p id="provider-cta" class="loading">Loading...</p>
+        <ul id="providers-list"><li class="loading">Loading...</li></ul>
   </div>
   <div class="card">
-    <h2>Presets</h2>
-    <ul id="presets-list"><li class="loading">Loading...</li></ul>
+        <h2>Recommended Tasks</h2>
+        <div id="recommended-tasks"><p class="loading">Loading...</p></div>
   </div>
   <div class="card">
-    <h2>Provider Center</h2>
-    <ul id="providers-list"><li class="loading">Loading...</li></ul>
+        <h2>Advanced Tasks</h2>
+        <div id="advanced-tasks"><p class="loading">Loading...</p></div>
   </div>
   <div class="card">
-    <h2>Active Runs</h2>
-    <ul id="runs-list"><li class="loading">Loading...</li></ul>
+        <h2>Recent Runs</h2>
+        <ul id="runs-list"><li class="loading">Loading...</li></ul>
+    </div>
+    <div class="card">
+        <h2>Optional Integrations</h2>
+        <ul id="integrations-list"><li class="loading">Loading...</li></ul>
   </div>
 </div>
 <div class="legend">
@@ -785,17 +852,195 @@ async function fetchJSON(url, options) {
     return { error: e.message };
   }
 }
+function clearElement(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+}
+function textNode(tag, text, className) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    el.textContent = text;
+    return el;
+}
+function badge(text, className) {
+    const span = document.createElement('span');
+    span.className = className ? 'badge ' + className : 'badge';
+    span.textContent = text;
+    return span;
+}
+function listMessage(listEl, message, className) {
+    clearElement(listEl);
+    const li = document.createElement('li');
+    if (className) li.className = className;
+    li.textContent = message;
+    listEl.appendChild(li);
+}
+function isQuestionFilled(question, value) {
+    if (question.type === 'confirm') return true;
+    return String(value || '').trim().length > 0;
+}
+function requiredQuestions(preset) {
+    return (preset.questions || []).filter(q => q.default === null || q.default === undefined || q.default === '');
+}
+function inputsReady(preset) {
+    const inputs = collectPresetInputs(preset.preset_id);
+    return requiredQuestions(preset).every(q => isQuestionFilled(q, inputs[q.key]));
+}
+function updateRunButtons() {
+    document.querySelectorAll('.run-btn[data-preset-id]').forEach(btn => {
+        const presetId = btn.getAttribute('data-preset-id');
+        const preset = window.agentheimTasksById[presetId];
+        if (!preset) return;
+        btn.disabled = !inputsReady(preset);
+    });
+}
+function renderReadiness(readiness) {
+    const list = document.getElementById('readiness-list');
+    clearElement(list);
+    const statusItem = document.createElement('li');
+    statusItem.textContent = 'Status: ' + readiness.status;
+    statusItem.appendChild(badge(readiness.profile_name || 'default', ''));
+    list.appendChild(statusItem);
+    const detailItem = document.createElement('li');
+    detailItem.textContent = readiness.detail || 'Ready to start.';
+    list.appendChild(detailItem);
+    if (readiness.missing_roles && readiness.missing_roles.length) {
+        const roles = document.createElement('li');
+        roles.textContent = 'Missing roles: ' + readiness.missing_roles.join(', ');
+        list.appendChild(roles);
+    }
+    (readiness.next_actions || []).forEach(action => {
+        const li = document.createElement('li');
+        li.textContent = action;
+        list.appendChild(li);
+    });
+}
+function renderProviders(providers, ctaText) {
+    const cta = document.getElementById('provider-cta');
+    cta.textContent = ctaText;
+    cta.className = '';
+    const list = document.getElementById('providers-list');
+    if (providers.error) {
+        listMessage(list, providers.error, 'error');
+        return;
+    }
+    clearElement(list);
+    if (!providers.configured || !providers.profiles.length) {
+        listMessage(list, 'No providers configured yet.', 'loading');
+        return;
+    }
+    providers.profiles.forEach(profile => {
+        profile.providers.forEach(provider => {
+            const li = document.createElement('li');
+            li.appendChild(textNode('span', profile.name + ' / ' + provider.id));
+            li.appendChild(badge(provider.kind));
+            list.appendChild(li);
+        });
+    });
+}
+function createQuestionInput(preset, question) {
+    const label = document.createElement('label');
+    label.className = 'preset-question';
+    label.textContent = question.text;
+    let input;
+    const value = question.default === null || question.default === undefined ? '' : question.default;
+    if (question.options && question.options.length) {
+        input = document.createElement('select');
+        question.options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            if (String(opt) === String(value)) option.selected = true;
+            input.appendChild(option);
+        });
+    } else if (question.type === 'confirm') {
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = value === true;
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.value = String(value);
+        input.placeholder = question.key;
+    }
+    input.setAttribute('data-preset-id', preset.preset_id);
+    input.setAttribute('data-input-key', question.key);
+    input.addEventListener('input', updateRunButtons);
+    input.addEventListener('change', updateRunButtons);
+    label.appendChild(input);
+    return label;
+}
+function createTaskItem(preset) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'task-group';
+    const title = document.createElement('h3');
+    title.textContent = preset.name;
+    wrapper.appendChild(title);
+    wrapper.appendChild(textNode('p', preset.description));
+    const meta = document.createElement('p');
+    meta.className = 'task-meta';
+    meta.textContent = 'Task ID: ' + preset.preset_id;
+    wrapper.appendChild(meta);
+    (preset.questions || []).forEach(question => wrapper.appendChild(createQuestionInput(preset, question)));
+    const button = document.createElement('button');
+    button.className = 'run-btn';
+    button.textContent = 'Run';
+    button.setAttribute('data-preset-id', preset.preset_id);
+    button.addEventListener('click', () => runPreset(preset.preset_id));
+    wrapper.appendChild(button);
+    return wrapper;
+}
+function renderTaskSection(containerId, tasks, emptyText) {
+    const container = document.getElementById(containerId);
+    clearElement(container);
+    if (!tasks.length) {
+        container.appendChild(textNode('p', emptyText, 'loading'));
+        return;
+    }
+    tasks.forEach(task => container.appendChild(createTaskItem(task)));
+}
+function renderIntegrations(items) {
+    const list = document.getElementById('integrations-list');
+    clearElement(list);
+    if (!items.length) {
+        listMessage(list, 'No optional integrations detected.', 'loading');
+        return;
+    }
+    items.forEach(item => {
+        const li = document.createElement('li');
+        li.appendChild(textNode('span', item.integration_id));
+        li.appendChild(badge(item.available ? 'available' : 'unavailable', item.available ? 'state-stable' : 'state-beta'));
+        const detail = document.createElement('div');
+        detail.className = item.available ? '' : 'error';
+        detail.textContent = item.detail || item.next_action || '';
+        li.appendChild(detail);
+        list.appendChild(li);
+    });
+}
+function renderRecentRuns(runs) {
+    const runsList = document.getElementById('runs-list');
+    clearElement(runsList);
+    if (!runs.length) {
+        listMessage(runsList, 'No recent runs yet.', 'loading');
+        return;
+    }
+    runs.forEach(info => {
+        const li = document.createElement('li');
+        li.appendChild(textNode('span', (info.preset_id || info.workflow_id || 'run') + ' '));
+        li.appendChild(badge(info.status || 'unknown'));
+        li.appendChild(textNode('code', info.run_id));
+        if (info.summary) li.appendChild(textNode('div', info.summary, 'task-meta'));
+        runsList.appendChild(li);
+    });
+}
 function riskClass(level) {
   const map = { high: 'risk-high', medium: 'risk-medium', low: 'risk-low', none: 'risk-none' };
   return map[level] || 'risk-none';
 }
 async function loadAll() {
   const status = document.getElementById('status');
-  const [health, tools, workflows, presets, providers] = await Promise.all([
+    const [health, home, providers] = await Promise.all([
     fetchJSON('/api/health'),
-    fetchJSON('/api/tools'),
-    fetchJSON('/api/workflows'),
-    fetchJSON('/api/presets'),
+        fetchJSON('/api/status'),
     fetchJSON('/api/providers/profiles')
   ]);
 
@@ -804,43 +1049,23 @@ async function loadAll() {
     status.className = 'error';
     return;
   }
-  status.textContent = 'API connected &mdash; v' + health.version;
-  renderRuns();
-
-  const toolsList = document.getElementById('tools-list');
-  if (tools.error) { toolsList.innerHTML = '<li class="error">' + tools.error + '</li>'; }
-  else { toolsList.innerHTML = tools.map(t => '<li>' + t.tool_id + '<span class="badge ' + riskClass(t.risk_level) + '">' + t.risk_level + '</span></li>').join(''); }
-
-  const wfList = document.getElementById('workflows-list');
-  if (workflows.error) { wfList.innerHTML = '<li class="error">' + workflows.error + '</li>'; }
-  else { wfList.innerHTML = workflows.map(w => '<li>' + w.workflow_id + '<span class="badge state-' + w.support_state + '">' + w.support_state + '</span></li>').join(''); }
-
-  const presetList = document.getElementById('presets-list');
-  if (presets.error) { presetList.innerHTML = '<li class="error">' + presets.error + '</li>'; }
-  else { presetList.innerHTML = presets.map(p => '<li>' + p.preset_id + '<span class="badge state-' + p.support_state + '">' + p.support_state + '</span>' + renderPresetInputs(p) + ' <button class="run-btn" data-preset-id="' + p.preset_id + '">Run</button></li>').join('');
-    presetList.addEventListener('click', function(e) { if (e.target.classList.contains('run-btn')) { runPreset(e.target.dataset.presetId); } }); }
-
-  const providerList = document.getElementById('providers-list');
-  if (providers.error) { providerList.innerHTML = '<li class="error">' + providers.error + '</li>'; }
-  else if (!providers.configured) { providerList.innerHTML = '<li class="error">' + providers.error + '</li>'; }
-  else {
-    providerList.innerHTML = providers.profiles.flatMap(p => p.providers.map(provider => '<li>' + p.name + ' / ' + provider.id + '<span class="badge">' + provider.kind + '</span></li>')).join('') || '<li class="loading">No providers configured</li>';
+    status.textContent = 'API connected — v' + health.version;
+    window.agentheimTasksById = Object.create(null);
+    if (home.error) {
+        status.textContent = 'Error: ' + home.error;
+        status.className = 'error';
+        return;
   }
-}
-function renderPresetInputs(preset) {
-  const questions = preset.questions || [];
-  if (!questions.length) return '';
-  return '<div class="preset-inputs">' + questions.map(q => {
-    const id = 'preset-' + preset.preset_id + '-' + q.key;
-    const value = q.default === null || q.default === undefined ? '' : q.default;
-    if (q.options && q.options.length) {
-      return '<label>' + q.key + '<select data-preset-id="' + preset.preset_id + '" data-input-key="' + q.key + '">' + q.options.map(opt => '<option value="' + opt + '"' + (opt === value ? ' selected' : '') + '>' + opt + '</option>').join('') + '</select></label>';
-    }
-    if (q.type === 'confirm') {
-      return '<label>' + q.key + '<input type="checkbox" data-preset-id="' + preset.preset_id + '" data-input-key="' + q.key + '"' + (value === true ? ' checked' : '') + '></label>';
-    }
-    return '<label>' + q.key + '<input id="' + id + '" type="text" value="' + value + '" data-preset-id="' + preset.preset_id + '" data-input-key="' + q.key + '"></label>';
-  }).join('') + '</div>';
+    [...home.recommended_tasks, ...home.advanced_tasks].forEach(task => {{
+        window.agentheimTasksById[task.preset_id] = task;
+    }});
+    renderReadiness(home.readiness);
+    renderProviders(providers, home.provider_cta);
+    renderTaskSection('recommended-tasks', home.recommended_tasks || [], 'No recommended tasks available.');
+    renderTaskSection('advanced-tasks', home.advanced_tasks || [], 'No advanced tasks available.');
+    renderIntegrations(home.optional_integrations || []);
+    renderRecentRuns(home.recent_runs || []);
+    updateRunButtons();
 }
 function collectPresetInputs(preset_id) {
   const inputs = {};
@@ -898,15 +1123,15 @@ async function ctxDocs(action) {
 }
 const activeRuns = new Map();
 async function runPreset(preset_id) {
-  const runsList = document.getElementById('runs-list');
-  runsList.innerHTML = '<li>Starting ' + preset_id + '...</li>';
+    const runsList = document.getElementById('runs-list');
+    listMessage(runsList, 'Starting ' + preset_id + '...', 'loading');
   const data = await fetchJSON('/api/presets/' + preset_id + '/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ inputs: collectPresetInputs(preset_id) })
   });
   if (data.error) {
-    runsList.innerHTML = '<li class="error">Failed to start ' + preset_id + ': ' + data.error + '</li>';
+        listMessage(runsList, 'Failed to start ' + preset_id + ': ' + data.error, 'error');
     return;
   }
   const run_id = data.run_id;
@@ -916,20 +1141,28 @@ async function runPreset(preset_id) {
 }
 function renderRuns() {
   const runsList = document.getElementById('runs-list');
-  if (activeRuns.size === 0) { runsList.innerHTML = '<li class="loading">No active runs</li>'; return; }
-  runsList.innerHTML = Array.from(activeRuns.entries()).map(([run_id, info]) => {
-    let statusClass = 'run-status';
-    if (info.status === 'completed') statusClass += ' run-completed';
-    if (info.status === 'failed') statusClass += ' run-failed';
-    let details = '';
-    if (info.artifacts && info.artifacts.length) {
-      details += '<div class="run-artifacts">Artifacts: ' + info.artifacts.map(a => '<span class="badge">' + a + '</span>').join(' ') + '</div>';
-    }
-    if (info.error) {
-      details += '<div class="run-error">' + info.error + '</div>';
-    }
-    return '<li>' + info.preset_id + ' <span class="' + statusClass + '">' + info.status + '</span> <code>' + run_id + '</code>' + details + '</li>';
-  }).join('');
+    clearElement(runsList);
+    if (activeRuns.size === 0) { listMessage(runsList, 'No recent runs yet.', 'loading'); return; }
+    Array.from(activeRuns.entries()).forEach(([run_id, info]) => {
+        let statusClass = 'run-status';
+        if (info.status === 'completed') statusClass += ' run-completed';
+        if (info.status === 'failed') statusClass += ' run-failed';
+        const li = document.createElement('li');
+        li.appendChild(textNode('span', info.preset_id + ' '));
+        li.appendChild(textNode('span', info.status, statusClass));
+        li.appendChild(textNode('code', run_id));
+        if (info.artifacts && info.artifacts.length) {
+            const artifacts = document.createElement('div');
+            artifacts.className = 'run-artifacts';
+            artifacts.appendChild(textNode('span', 'Artifacts: '));
+            info.artifacts.forEach(a => artifacts.appendChild(badge(a)));
+            li.appendChild(artifacts);
+        }
+        if (info.error) {
+            li.appendChild(textNode('div', info.error, 'run-error'));
+        }
+        runsList.appendChild(li);
+    });
 }
 async function pollRun(run_id) {
   for (let i = 0; i < 120; i++) {
@@ -946,3 +1179,4 @@ loadAll();
 </body>
 </html>
 """
+    return html.replace("__AGENTHEIM_VERSION__", app_version)

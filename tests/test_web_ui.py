@@ -23,7 +23,7 @@ class TestHealth:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert "version" in data
+        assert data["version"] == "0.1.0"
 
 
 class TestDashboard:
@@ -33,15 +33,75 @@ class TestDashboard:
         assert "text/html" in response.headers["content-type"]
         assert "Agentheim" in response.text
         assert "Prototype" not in response.text
+        assert "prototype" not in response.text
         assert "Local agent workflow dashboard" in response.text
 
-    def test_root_renders_preset_inputs_and_collects_values(self, client: TestClient) -> None:
+    def test_root_renders_product_home_sections(self, client: TestClient) -> None:
         response = client.get("/")
         assert response.status_code == 200
-        assert "renderPresetInputs(p)" in response.text
+        assert "Recommended Tasks" in response.text
+        assert "Advanced Tasks" in response.text
+        assert "Optional Integrations" in response.text
+        assert "updateRunButtons()" in response.text
         assert "data-input-key" in response.text
         assert "collectPresetInputs(preset_id)" in response.text
-        assert "JSON.stringify({ inputs: {} })" not in response.text
+        assert "innerHTML = tools" not in response.text
+        assert "textContent = 'API connected" in response.text
+
+    def test_root_escapes_dynamic_values_via_dom_rendering(self, client: TestClient) -> None:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "createElement('li')" in response.text
+        assert "textContent =" in response.text
+        assert "providers.profiles.flatMap" not in response.text
+
+
+class TestProductHome:
+    def test_status_endpoint_returns_home_payload(self, client: TestClient) -> None:
+        response = client.get("/api/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "readiness" in data
+        assert "recommended_tasks" in data
+        assert "advanced_tasks" in data
+        assert "recent_runs" in data
+        assert "optional_integrations" in data
+        assert data["version"] == "0.1.0"
+
+    def test_status_groups_tasks_by_tier(self, client: TestClient) -> None:
+        response = client.get("/api/status")
+        data = response.json()
+        assert all(task["product_tier"] == "recommended" for task in data["recommended_tasks"])
+        assert all(task["product_tier"] == "advanced" for task in data["advanced_tasks"])
+
+    def test_status_includes_recent_runs(self, tmp_path: Path) -> None:
+        app = create_app(repo_root=tmp_path)
+        local_client = TestClient(app)
+        run_dir = tmp_path / ".ai-team" / "runs" / "recent-run"
+        run_dir.mkdir(parents=True)
+        (run_dir / "run.json").write_text(
+            json.dumps({"run_id": "recent-run", "workflow_id": "research", "preset_id": "research-report"}),
+            encoding="utf-8",
+        )
+        (run_dir / "final_report.json").write_text(
+            json.dumps({"run_id": "recent-run", "topic": "Escaping", "status": "done"}),
+            encoding="utf-8",
+        )
+        (run_dir / "final_report.md").write_text("# Recent", encoding="utf-8")
+        response = local_client.get("/api/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert any(run["run_id"] == "recent-run" for run in data["recent_runs"])
+
+    def test_status_handles_optional_integrations(self, client: TestClient) -> None:
+        response = client.get("/api/status")
+        data = response.json()
+        assert isinstance(data["optional_integrations"], list)
+
+    def test_task_run_requires_inputs(self, client: TestClient) -> None:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "btn.disabled = !inputsReady(preset)" in response.text
 
 
 class TestRuns:

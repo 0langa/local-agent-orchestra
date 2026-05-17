@@ -1,6 +1,6 @@
-"""Web UI prototype for agent orchestration.
+"""Web UI for Agentheim local dashboard and API.
 
-FastAPI-based dashboard and API for tools, workflows, presets, and memory.
+FastAPI-based product surface for readiness, tasks, runs, tools, workflows, presets, and memory.
 """
 
 from __future__ import annotations
