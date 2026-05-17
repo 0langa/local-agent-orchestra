@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any
@@ -18,14 +19,13 @@ from core.public_api import (
     RunStatus,
     ToolContext,
     ToolInvoker,
-    build_live_run_summary,
-    build_run_summary,
     build_model_registry,
     error_summary,
     interface_policy_config,
     list_run_views,
     list_workflows as cap_list_workflows,
 )
+from interfaces.common.run_views import run_status_payload
 from memory.bus import MemoryBus
 from tools.registry import ToolRegistry, create_core_tool_registry
 
@@ -37,6 +37,7 @@ from interfaces.tool_approval import InterfaceApprovalStore
 from presets.base import PresetInputError
 from presets.catalog import CATALOG, QuestionSchema
 
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------
 # Pydantic models (module-level for FastAPI compatibility)
@@ -261,11 +262,6 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
             "override_possible": policy.override_possible,
             "metadata": policy.metadata,
         }
-
-    def _run_status_payload(run_id: str, record: RunRecord | None = None) -> CanonicalRunSummary:
-        if record is not None:
-            return build_live_run_summary(repo_root, run_id, record)
-        return build_run_summary(repo_root, run_id)
 
     def _preset_item(preset_id: str) -> PresetListItem:
         return PresetListItem(**CATALOG.get(preset_id).model_dump())
@@ -502,13 +498,13 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         """Get the status of a run."""
         record = run_executor.get(run_id)
         if record is not None:
-            return _run_status_payload(run_id, record)
+            return run_status_payload(repo_root, run_id, record)
 
         run_dir = repo_root / ".ai-team" / "runs" / run_id
         if not run_dir.exists():
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
-        return _run_status_payload(run_id)
+        return run_status_payload(repo_root, run_id)
 
     @app.get("/api/runs/{run_id}/stream")
     def stream_run_status(run_id: str):
@@ -522,7 +518,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
         async def _event_generator():
             last_status = None
-            yield f"data: {json.dumps(_run_status_payload(run_id, record).model_dump(mode='json'))}\n\n"
+            yield f"data: {json.dumps(run_status_payload(repo_root, run_id, record).model_dump(mode='json'))}\n\n"
             for _ in range(3600):
                 await asyncio.sleep(1)
                 current = run_executor.get(run_id)
@@ -530,7 +526,7 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
                     break
                 if current.status.value != last_status:
                     last_status = current.status.value
-                    payload = _run_status_payload(run_id, current).model_dump(mode="json")
+                    payload = run_status_payload(repo_root, run_id, current).model_dump(mode="json")
                     yield f"data: {json.dumps(payload)}\n\n"
                 if current.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     break
@@ -684,13 +680,13 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
 
         run_executor.subscribe(run_id, on_update)
         try:
-            await websocket.send_json(_run_status_payload(run_id, record).model_dump(mode="json"))
+            await websocket.send_json(run_status_payload(repo_root, run_id, record).model_dump(mode="json"))
             if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                 await websocket.close()
                 return
             while True:
                 record = await queue.get()
-                payload = _run_status_payload(run_id, record).model_dump(mode="json")
+                payload = run_status_payload(repo_root, run_id, record).model_dump(mode="json")
                 await websocket.send_json(payload)
                 if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     await websocket.close()
@@ -709,8 +705,8 @@ def _import_workflows() -> None:
         from workflows.registry import register_builtin_workflows
 
         register_builtin_workflows()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to register builtin workflows: %s", exc)
 
 
 def _dashboard_html(app_version: str) -> str:

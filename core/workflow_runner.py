@@ -212,8 +212,8 @@ class WorkflowRunner:
                         )
                         try:
                             write_diagnostics_bundle(ledger.run_dir, run_id)
-                        except Exception:
-                            pass
+                        except Exception as _exc:
+                            logger.warning("Failed to write diagnostics bundle for run_id=%s: %s", run_id, _exc)
                     workflow.on_run_complete(results)
                     return results
 
@@ -240,8 +240,8 @@ class WorkflowRunner:
                 )
                 try:
                     write_diagnostics_bundle(ledger.run_dir, run_id)
-                except Exception:
-                    pass
+                except Exception as _exc:
+                    logger.warning("Failed to write diagnostics bundle for run_id=%s: %s", run_id, _exc)
             workflow.on_run_complete(results)
             raise
         finally:

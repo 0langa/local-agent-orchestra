@@ -546,13 +546,16 @@ class EncryptedFileSecretStore(SecretStore):
 
 
 def get_secret_store(prefer_keyring: bool = True) -> SecretStore:
+    import logging
+
+    logger = logging.getLogger(__name__)
     if os.getenv("AGENTHEIM_SECRET_BACKEND", "").strip().lower() == "file":
         return EncryptedFileSecretStore()
     if prefer_keyring:
         try:
             return KeyringSecretStore()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("OS keychain unavailable (%s); falling back to encrypted file vault. Set AGENTHEIM_SECRET_BACKEND=file to silence this warning.", exc)
     return EncryptedFileSecretStore()
 
 

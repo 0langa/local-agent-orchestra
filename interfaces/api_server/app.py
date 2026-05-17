@@ -36,9 +36,8 @@ from core.public_api import (
     RunStatus,
     ToolContext,
     ToolInvoker,
-    build_live_run_summary,
-    build_run_summary,
     build_model_registry,
+    build_run_summary,
     build_run_view,
     catalog_entry_for,
     format_api_response,
@@ -46,6 +45,7 @@ from core.public_api import (
     list_run_views,
     list_workflows as cap_list_workflows,
 )
+from interfaces.common.run_views import run_status_payload
 from memory.bus import MemoryBus
 from tools.registry import ToolRegistry, create_core_tool_registry
 
@@ -484,18 +484,13 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             "metadata": policy.metadata,
         }
 
-    def _run_status_payload(run_id: str, record: RunRecord | None = None) -> CanonicalRunSummary:
-        if record is not None:
-            return build_live_run_summary(repo_root, run_id, record)
-        return build_run_summary(repo_root, run_id)
-
     def _import_workflows() -> None:
         try:
             from workflows.registry import register_builtin_workflows
 
             register_builtin_workflows()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to register builtin workflows: %s", exc)
 
     def _tool_schema_to_dict(tool) -> dict[str, Any]:
         params = {}
@@ -909,8 +904,8 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
                 )
                 for model in registry.list_models()
             ]
-        except (ConfigError, ValueError):
-            return []
+        except (ConfigError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid provider configuration: {exc}") from exc
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Failed to list models: {exc}") from exc
 
@@ -1036,14 +1031,14 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
         # First check in-memory executor
         record = run_executor.get(run_id)
         if record is not None:
-            return _run_status_payload(run_id, record)
+            return run_status_payload(repo_root, run_id, record)
 
         # Fallback to disk
         run_dir = repo_root / ".ai-team" / "runs" / run_id
         if not run_dir.exists():
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
-        return _run_status_payload(run_id)
+        return run_status_payload(repo_root, run_id)
 
     @app.get("/api/runs/{run_id}/stream", tags=["runs"])
     def stream_run_status(run_id: str):
@@ -1058,7 +1053,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             import json
             last_status = None
             # Yield initial status immediately
-            yield f"data: {json.dumps(_run_status_payload(run_id, record).model_dump(mode='json'))}\n\n"
+            yield f"data: {json.dumps(run_status_payload(repo_root, run_id, record).model_dump(mode='json'))}\n\n"
             for _ in range(3600):  # Max ~1 hour of streaming
                 await asyncio.sleep(1)
                 current = run_executor.get(run_id)
@@ -1066,7 +1061,7 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
                     break
                 if current.status.value != last_status:
                     last_status = current.status.value
-                    payload = _run_status_payload(run_id, current).model_dump(mode="json")
+                    payload = run_status_payload(repo_root, run_id, current).model_dump(mode="json")
                     yield f"data: {json.dumps(payload)}\n\n"
                 if current.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     break
@@ -1216,17 +1211,17 @@ def create_api_app(repo_root: str | Path = ".") -> FastAPI:
             try:
                 asyncio.run_coroutine_threadsafe(queue.put(r), loop)
             except Exception:
-                pass
+                logger.exception("WebSocket update enqueue failed for run_id=%s", run_id)
 
         run_executor.subscribe(run_id, on_update)
         try:
-            await websocket.send_json(_run_status_payload(run_id, record).model_dump(mode="json"))
+            await websocket.send_json(run_status_payload(repo_root, run_id, record).model_dump(mode="json"))
             if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                 await websocket.close()
                 return
             while True:
                 record = await queue.get()
-                payload = _run_status_payload(run_id, record).model_dump(mode="json")
+                payload = run_status_payload(repo_root, run_id, record).model_dump(mode="json")
                 await websocket.send_json(payload)
                 if record.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED):
                     await websocket.close()

@@ -169,6 +169,9 @@ class RunExecutor:
                     pass
 
     def _notify(self, run_id: str) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
         with self._run_lock:
             record = self._runs.get(run_id)
             callbacks = list(self._subscribers.get(run_id, []))
@@ -178,7 +181,7 @@ class RunExecutor:
             try:
                 cb(record)
             except Exception:
-                pass
+                logger.exception("Run status subscriber failed for run_id=%s", run_id)
 
     def add_hook(self, hook: RunHook) -> None:
         """Register a lifecycle hook if not already registered."""

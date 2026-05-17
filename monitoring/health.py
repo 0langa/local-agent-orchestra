@@ -45,7 +45,7 @@ class HealthReporter:
                 message=f"{mem.available // (1024 ** 2)} MB available",
             )
         except ImportError:
-            return HealthStatus(component="memory", healthy=True, message="psutil not installed")
+            return HealthStatus(component="memory", healthy=False, message="psutil not installed; install with: pip install psutil")
 
     def check_providers(self) -> list[HealthStatus]:
         """Basic provider health (imports successfully)."""
