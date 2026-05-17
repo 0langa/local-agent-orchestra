@@ -566,14 +566,16 @@ def create_app(repo_root: str | Path = ".") -> FastAPI:
         return MemoryWriteResponse(scope=scope, key=key)
 
     def _ctx_exc(exc: Exception):
-        summary = error_summary(exc)
-        summary["message"] = "Context operation failed."
+        summary = error_summary(RuntimeError("Context operation failed."))
+        summary["type"] = "ContextOperationError"
         summary["detail"] = "Context operation failed. Check the server logs for details."
         status_code = 500
         if isinstance(exc, ValueError):
             status_code = 400
+            summary["type"] = "ValueError"
         if isinstance(exc, SafetyError):
             status_code = 409
+            summary["type"] = "SafetyError"
         return JSONResponse(status_code=status_code, content=summary)
 
     @app.post("/api/ctx/init")
