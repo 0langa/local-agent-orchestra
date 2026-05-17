@@ -2,23 +2,26 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from config.config import (
     ModelBinding,
     ModelRole,
     ProfilesDocument,
     TeamProfile,
+    load_team_config,
     get_secret_store,
     load_profiles_document,
     make_secret_ref,
     provider_account_from_template,
     save_profiles_document,
 )
-from core.public_api import ConfigError
+from core.public_api import ConfigError, RunView, list_run_views
 from interfaces.readiness import ReadinessState, build_readiness_state
 
 
@@ -170,6 +173,68 @@ def _render_text_result(payload: dict[str, Any], readiness: ReadinessState) -> N
         console.print(action)
 
 
+def _recent_runs(repo_root: Path) -> list[RunView]:
+    try:
+        return list_run_views(repo_root)[:5]
+    except Exception:
+        return []
+
+
+def _status_payload(profile: str | None, repo_root: Path) -> dict[str, Any]:
+    readiness = build_readiness_state()
+    active_profile = readiness.profile_name
+
+    if profile and profile != active_profile:
+        config = load_team_config(profile=profile)
+        active_profile = config.profile_name
+        readiness = build_readiness_state()
+        readiness.profile_name = active_profile
+
+    recent_runs = _recent_runs(repo_root)
+    return {
+        "status": readiness.status.value,
+        "profile": active_profile,
+        "repo": str(repo_root),
+        "readiness": readiness.model_dump(mode="json"),
+        "provider_readiness": [provider.model_dump(mode="json") for provider in readiness.configured_providers],
+        "missing_roles": readiness.missing_roles,
+        "optional_integrations": [integration.model_dump(mode="json") for integration in readiness.optional_integrations],
+        "recent_runs": [run.model_dump(mode="json") for run in recent_runs],
+        "next_actions": readiness.next_actions,
+    }
+
+
+def _render_status_text(payload: dict[str, Any]) -> None:
+    readiness = payload["readiness"]
+    console.print(f"status: {payload['status']}")
+    console.print(f"profile: {payload['profile']}")
+    console.print(f"repo: {payload['repo']}")
+    console.print(f"provider readiness: {readiness['status']}")
+    if payload["missing_roles"]:
+        console.print(f"missing roles: {', '.join(payload['missing_roles'])}")
+    else:
+        console.print("missing roles: none")
+
+    if payload["optional_integrations"]:
+        for integration in payload["optional_integrations"]:
+            state = "available" if integration["available"] else "unavailable"
+            console.print(f"optional integration {integration['integration_id']}: {state}")
+
+    if payload["recent_runs"]:
+        table = Table(title="Recent runs")
+        table.add_column("Run")
+        table.add_column("Status")
+        table.add_column("Summary")
+        for run in payload["recent_runs"]:
+            table.add_row(run["run_id"], run["status"], run.get("summary", ""))
+        console.print(table)
+    else:
+        console.print("recent runs: none")
+
+    for action in payload["next_actions"]:
+        console.print(action)
+
+
 @product_app.command("setup", rich_help_panel="Getting Started")
 def setup_cmd(
     provider: str | None = typer.Option(None, "--provider", help="Beginner provider choice."),
@@ -252,3 +317,18 @@ def setup_cmd(
         console.print_json(json.dumps(payload))
         return
     _render_text_result(payload, readiness)
+
+
+@product_app.command("status", rich_help_panel="Getting Started")
+def status_cmd(
+    profile: str | None = typer.Option(None, "--profile", help="Profile name override."),
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Repository root for recent run lookup."),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    """Show provider readiness, integrations, recent runs, and next actions."""
+    repo_root = repo.resolve()
+    payload = _status_payload(profile, repo_root)
+    if as_json:
+        console.print_json(json.dumps(payload))
+        return
+    _render_status_text(payload)
