@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from core.errors import ResumeError
 from core.events import EventType
 from core.ledger import RunLedger
+from core.path_security import safe_child_path, safe_project_path, safe_run_id
 from core.resume import list_runs
 from core.run_summary import build_run_summary
 
@@ -79,8 +80,9 @@ def _next_actions(status: str, resume_available: bool) -> list[str]:
 
 
 def build_run_view(repo_root: str | Path, run_id: str) -> RunView:
-    repo_root = Path(repo_root).resolve()
-    run_dir = repo_root / ".ai-team" / "runs" / run_id
+    repo_root = safe_project_path(repo_root)
+    run_id = safe_run_id(run_id)
+    run_dir = safe_child_path(repo_root, ".ai-team", "runs", run_id)
 
     if not run_dir.exists():
         raise ResumeError(f"Run '{run_id}' not found under {repo_root}")
@@ -124,14 +126,14 @@ def build_run_view(repo_root: str | Path, run_id: str) -> RunView:
 
 
 def list_run_views(repo_root: str | Path) -> list[RunView]:
-    repo_root = Path(repo_root).resolve()
+    repo_root = safe_project_path(repo_root)
     run_ids = list_runs(repo_root)
     views: list[RunView] = []
     for run_id in run_ids:
         try:
             views.append(build_run_view(repo_root, run_id))
         except Exception:
-            run_dir = repo_root / ".ai-team" / "runs" / run_id
+            run_dir = safe_child_path(repo_root, ".ai-team", "runs", safe_run_id(run_id))
             views.append(
                 RunView(
                     run_id=run_id,

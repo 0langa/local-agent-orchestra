@@ -18,6 +18,7 @@ from _thread import LockType
 from typing import Any, Optional
 
 from core.events import Event, EventType
+from core.path_security import safe_child_path, safe_project_path
 
 
 def slugify(value: str) -> str:
@@ -56,8 +57,9 @@ class RunLedger:
 
     @classmethod
     def create(cls, repo_root: Path, purpose: str) -> "RunLedger":
+        repo_root = safe_project_path(repo_root)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        run_dir = repo_root / ".ai-team" / "runs" / f"{timestamp}-{slugify(purpose)}"
+        run_dir = safe_child_path(repo_root, ".ai-team", "runs", f"{timestamp}-{slugify(purpose)}")
         run_dir.mkdir(parents=True, exist_ok=True)
 
         # Legacy files (backward compatibility)

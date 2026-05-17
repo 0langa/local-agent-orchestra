@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.error_classification import error_summary_from_text
 from core.events import EventType
+from core.path_security import safe_child_path, safe_project_path, safe_run_id
 from core.run_executor import RunRecord, RunStatus
 
 
@@ -282,8 +283,9 @@ def _infer_next_action(
 
 
 def build_run_summary(repo_root: str | Path, run_id: str, *, tracking_run_id: str | None = None) -> CanonicalRunSummary:
-    repo_root = Path(repo_root).resolve()
-    run_dir = repo_root / ".ai-team" / "runs" / run_id
+    repo_root = safe_project_path(repo_root)
+    run_id = safe_run_id(run_id)
+    run_dir = safe_child_path(repo_root, ".ai-team", "runs", run_id)
     if not run_dir.exists():
         raise FileNotFoundError(f"Run '{run_id}' not found under {repo_root}")
 
@@ -508,6 +510,7 @@ def write_diagnostics_bundle(run_dir: Path, run_id: str | None = None) -> tuple[
     run_dir = Path(run_dir).resolve()
     if run_id is None:
         run_id = run_dir.name
+    run_id = safe_run_id(run_id)
     repo_root = run_dir.parent.parent.parent
     summary = build_run_summary(repo_root, run_id)
 
@@ -528,9 +531,11 @@ def build_live_run_summary(
     """Return canonical payload for an executor-backed run."""
     resolved_run_id = resolve_run_id(record)
     if resolved_run_id is not None:
-        run_dir = Path(repo_root).resolve() / ".ai-team" / "runs" / resolved_run_id
+        safe_id = safe_run_id(resolved_run_id)
+        repo_path = safe_project_path(repo_root)
+        run_dir = safe_child_path(repo_path, ".ai-team", "runs", safe_id)
         if run_dir.exists():
-            return build_run_summary(repo_root, resolved_run_id, tracking_run_id=tracking_run_id)
+            return build_run_summary(repo_path, safe_id, tracking_run_id=tracking_run_id)
 
     error = None
     if record.error:

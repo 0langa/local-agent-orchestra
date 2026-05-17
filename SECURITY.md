@@ -2,34 +2,36 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| master  | :white_check_mark: |
-| < master| :x:                |
+| Version | Supported |
+| ------- | --------- |
+| Latest `master` | Yes |
+| Latest tagged release | Yes |
+| Older commits/releases | No |
 
-Agentheim is currently in active development. Only the latest commit on `master` receives security updates.
+Agentheim is developed as an open-source local-first product. Security fixes are applied to the current `master` branch and the latest tagged release.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Agentheim, please report it responsibly.
+Please report suspected vulnerabilities privately through GitHub Security Advisories for this repository:
 
-**Do NOT open a public issue.**
+https://github.com/0langa/agentheim/security/advisories/new
 
-Instead, please send an email to the maintainer with:
-- A description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+Do not open a public issue for suspected vulnerabilities. Include:
 
-We will acknowledge receipt within 48 hours and provide a timeline for a fix.
+- The affected component.
+- Steps to reproduce.
+- Expected impact.
+- Relevant logs with secrets redacted.
+
+## Handling
+
+Maintainers will acknowledge valid reports, investigate impact, and publish fixes through normal release notes once remediation is available.
 
 ## Security Features
 
-Agentheim is designed with security as a core principle:
-
-- **Path confinement** — All filesystem operations are scoped to the workspace
-- **Policy engine** — All tool invocations are gated by configurable risk policies
-- **Secret redaction** — API keys and tokens are stripped from all logs and artifacts
-- **Local-first** — By default, no data leaves your machine
-- **Approval gates** — Destructive operations require explicit confirmation
-- **Audit trail** — Every action is recorded in an append-only event ledger
+- Path confinement for workspace and run-artifact operations.
+- Policy evaluation for tool invocations.
+- Secret redaction for logs, API responses, and artifacts.
+- Local-first defaults; provider calls require explicit user configuration.
+- Approval gates for higher-risk operations.
+- Append-only run ledger for auditability.
