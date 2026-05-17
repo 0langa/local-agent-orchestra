@@ -16,10 +16,18 @@ from agentheim.vendor.aictx.errors import SafetyError, VerificationError
 
 ctx_app = typer.Typer(help="AICtx context operations.")
 public_docs_app = typer.Typer(help="Public docs impact and update commands.")
-ctx_app.add_typer(public_docs_app, name="public-docs")
+ctx_app.add_typer(
+    public_docs_app,
+    name="public-docs",
+    help="Public docs commands: impact, update.",
+)
 
 from interfaces.cli.oci_commands import oci_app
-ctx_app.add_typer(oci_app, name="oci")
+ctx_app.add_typer(
+    oci_app,
+    name="oci",
+    help="OCI commands: doctor, snapshot create/verify, bundle create/verify.",
+)
 
 console = Console()
 

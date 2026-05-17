@@ -56,6 +56,13 @@ def _read_secret(value: str | None, auth_mode: str) -> str | None:
     return entered.strip()
 
 
+def _resolve_profile(document: ProfilesDocument, profile: str) -> TeamProfile:
+    profile_obj = document.profiles.get(profile)
+    if profile_obj is None:
+        raise typer.BadParameter(f"Unknown profile: {profile}")
+    return profile_obj
+
+
 @provider_app.command("templates")
 def templates(all: bool = typer.Option(False, "--all", help="Include experimental provider templates.")) -> None:
     title = "Provider Templates" + (" (including experimental)" if all else "")
@@ -138,6 +145,88 @@ def list_providers(profile: str | None = typer.Option(None, "--profile", help="P
         console.print(role_table)
 
 
+@provider_app.command("profiles")
+def list_profile_names() -> None:
+    document = load_profiles_document()
+    table = Table(title="Provider Profiles")
+    table.add_column("profile")
+    table.add_column("default")
+    table.add_column("providers", justify="right")
+    table.add_column("role_bindings", justify="right")
+    for profile_name in sorted(document.profiles):
+        profile_obj = document.profiles[profile_name]
+        table.add_row(
+            profile_name,
+            "yes" if document.default_profile == profile_name else "",
+            str(len(profile_obj.providers)),
+            str(len(profile_obj.models)),
+        )
+    console.print(table)
+
+
+@provider_app.command("update")
+def update_provider(
+    provider_id: str = typer.Argument(..., help="Provider id inside this Agentheim profile."),
+    profile: str = typer.Option("default", "--profile", help="Profile name."),
+    endpoint: str | None = typer.Option(None, "--endpoint", help="Override provider endpoint."),
+    auth_mode: str | None = typer.Option(None, "--auth-mode", help="Override provider auth mode."),
+    header: list[str] = typer.Option([], "--header", help="Header override as key=value. Repeatable."),
+    metadata: list[str] = typer.Option([], "--metadata", help="Metadata override as key=value. Repeatable."),
+    timeout_seconds: int | None = typer.Option(None, "--timeout-seconds", min=1, help="Override provider timeout in seconds."),
+    api_key: str | None = typer.Option(None, "--api-key", help="Replace secret value. Use empty string to clear when auth mode allows it."),
+) -> None:
+    document = load_profiles_document()
+    profile_obj = _resolve_profile(document, profile)
+    provider = profile_obj.providers.get(provider_id)
+    if provider is None:
+        raise typer.BadParameter(f"Unknown provider '{provider_id}' in profile '{profile}'")
+
+    headers = dict(provider.headers)
+    for item in header:
+        if "=" not in item:
+            raise typer.BadParameter(f"Invalid --header value '{item}'. Use key=value.")
+        key, value = item.split("=", 1)
+        headers[key.strip()] = value.strip()
+
+    metadata_dict = dict(provider.metadata)
+    for item in metadata:
+        if "=" not in item:
+            raise typer.BadParameter(f"Invalid --metadata value '{item}'. Use key=value.")
+        key, value = item.split("=", 1)
+        metadata_dict[key.strip()] = value.strip()
+
+    next_auth_mode = auth_mode or provider.auth_mode
+    updated_provider = provider.model_copy(
+        update={
+            "endpoint": endpoint if endpoint is not None else provider.endpoint,
+            "auth_mode": next_auth_mode,
+            "headers": headers,
+            "metadata": metadata_dict,
+            "timeout_seconds": timeout_seconds if timeout_seconds is not None else provider.timeout_seconds,
+        }
+    )
+
+    secret_ref = updated_provider.secret_ref
+    if next_auth_mode in {"none", "aws_chain", "google_adc", "oci_config"}:
+        if secret_ref:
+            get_secret_store().delete(secret_ref)
+        updated_provider = updated_provider.model_copy(update={"secret_ref": None})
+    elif api_key is not None:
+        if api_key == "":
+            if secret_ref:
+                get_secret_store().delete(secret_ref)
+            updated_provider = updated_provider.model_copy(update={"secret_ref": None})
+        else:
+            if not secret_ref:
+                secret_ref = make_secret_ref(provider_id)
+                updated_provider = updated_provider.model_copy(update={"secret_ref": secret_ref})
+            get_secret_store().set(secret_ref, api_key)
+
+    profile_obj.providers[provider_id] = updated_provider
+    save_profiles_document(document)
+    console.print(f"provider updated: {provider_id} profile={profile}")
+
+
 @provider_app.command("use")
 def use_profile(
     profile: str = typer.Argument(..., help="Profile name."),
@@ -164,9 +253,7 @@ def assign_model(
     capability: list[str] = typer.Option(["text", "json"], "--capability", "-c", help="Model capability."),
 ) -> None:
     document = load_profiles_document()
-    profile_obj = document.profiles.get(profile)
-    if profile_obj is None:
-        raise typer.BadParameter(f"Unknown profile: {profile}")
+    profile_obj = _resolve_profile(document, profile)
     if provider_id not in profile_obj.providers:
         raise typer.BadParameter(f"Unknown provider '{provider_id}' in profile '{profile}'")
     profile_obj.models[role.value] = ModelBinding(
@@ -181,6 +268,40 @@ def assign_model(
     console.print(f"assigned: {role.value} -> {provider_id}/{model}")
 
 
+@provider_app.command("assign-all")
+def assign_all_models(
+    provider_id: str = typer.Option(..., "--provider", help="Provider id."),
+    model: str = typer.Option(..., "--model", help="Model/deployment id."),
+    profile: str = typer.Option("default", "--profile", help="Profile name."),
+    capability: list[str] | None = typer.Option(None, "--capability", "-c", help="Override model capabilities for all assigned roles."),
+) -> None:
+    document = load_profiles_document()
+    profile_obj = _resolve_profile(document, profile)
+    if provider_id not in profile_obj.providers:
+        available = ", ".join(sorted(profile_obj.providers)) or "none"
+        raise typer.BadParameter(
+            f"Unknown provider '{provider_id}' in profile '{profile}'. Available providers: {available}"
+        )
+    if not profile_obj.models:
+        raise typer.BadParameter(f"Profile '{profile}' has no role bindings to update.")
+
+    updated = 0
+    for role_key, binding in list(profile_obj.models.items()):
+        capabilities = capability if capability is not None else list(binding.capabilities)
+        profile_obj.models[role_key] = ModelBinding(
+            id=role_key,
+            role=binding.role,
+            provider=provider_id,
+            model=model,
+            display_name=model,
+            capabilities=capabilities,
+        )
+        updated += 1
+
+    save_profiles_document(document)
+    console.print(f"assigned {updated} roles -> {provider_id}/{model} in profile={profile}")
+
+
 @provider_app.command("rotate-secret")
 def rotate_secret(
     provider_id: str = typer.Argument(..., help="Provider id."),
@@ -188,10 +309,13 @@ def rotate_secret(
     api_key: str | None = typer.Option(None, "--api-key", help="New secret value. Omit to prompt."),
 ) -> None:
     document = load_profiles_document()
-    provider = document.profiles[profile].providers[provider_id]
+    profile_obj = _resolve_profile(document, profile)
+    provider = profile_obj.providers.get(provider_id)
+    if provider is None:
+        raise typer.BadParameter(f"Unknown provider '{provider_id}' in profile '{profile}'")
     if not provider.secret_ref:
         provider = provider.model_copy(update={"secret_ref": make_secret_ref(provider_id)})
-        document.profiles[profile].providers[provider_id] = provider
+        profile_obj.providers[provider_id] = provider
     secret = _read_secret(api_key, provider.auth_mode)
     if secret is None:
         raise typer.BadParameter(f"Provider '{provider_id}' auth mode does not use a secret.")
@@ -203,8 +327,8 @@ def rotate_secret(
 @provider_app.command("remove")
 def remove_provider(provider_id: str, profile: str = typer.Option("default", "--profile")) -> None:
     document = load_profiles_document()
-    profile_obj = document.profiles.get(profile)
-    if profile_obj is None or provider_id not in profile_obj.providers:
+    profile_obj = _resolve_profile(document, profile)
+    if provider_id not in profile_obj.providers:
         raise typer.BadParameter(f"Unknown provider '{provider_id}' in profile '{profile}'")
     provider = profile_obj.providers.pop(provider_id)
     profile_obj.models = {k: v for k, v in profile_obj.models.items() if v.provider != provider_id}
@@ -212,6 +336,31 @@ def remove_provider(provider_id: str, profile: str = typer.Option("default", "--
         get_secret_store().delete(provider.secret_ref)
     save_profiles_document(document)
     console.print(f"provider removed: {provider_id}")
+
+
+@provider_app.command("delete-profile")
+def delete_profile(
+    profile: str = typer.Argument(..., help="Profile name to delete."),
+    force: bool = typer.Option(False, "--force", help="Delete even if the profile still contains providers and role bindings."),
+) -> None:
+    document = load_profiles_document()
+    profile_obj = _resolve_profile(document, profile)
+    if not force and (profile_obj.providers or profile_obj.models):
+        raise typer.BadParameter(
+            f"Profile '{profile}' is not empty. Remove its providers first or pass --force."
+        )
+
+    for provider in profile_obj.providers.values():
+        if provider.secret_ref:
+            get_secret_store().delete(provider.secret_ref)
+
+    del document.profiles[profile]
+
+    if document.default_profile == profile:
+        document.default_profile = sorted(document.profiles)[0] if document.profiles else "default"
+
+    save_profiles_document(document)
+    console.print(f"profile deleted: {profile}")
 
 
 @provider_app.command("test")

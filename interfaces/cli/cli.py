@@ -7,6 +7,7 @@ import sys
 from urllib.parse import urlparse
 from pathlib import Path
 from typing import Any
+from dataclasses import asdict, dataclass
 
 # Ensure repo root is on sys.path when running this script directly
 _repo_root = Path(__file__).resolve().parents[2]
@@ -54,14 +55,96 @@ from interfaces.cli.ctx_commands import ctx_app
 from interfaces.cli.provider_commands import provider_app
 
 app = typer.Typer(help="Local-first three-agent runtime.", pretty_exceptions_show_locals=False)
-app.add_typer(ctx_app, name="ctx", rich_help_panel="Context")
-app.add_typer(provider_app, name="provider", rich_help_panel="Getting Started")
+app.add_typer(
+    ctx_app,
+    name="ctx",
+    rich_help_panel="Context & Artifacts",
+    help="Context pipeline commands: init, scan, run, verify, status, clean, public-docs, and OCI subcommands.",
+)
+app.add_typer(
+    provider_app,
+    name="provider",
+    rich_help_panel="Setup & Configuration",
+    help="Provider profile commands: templates, add, list, use, assign, rotate-secret, remove, test, and import-env.",
+)
 console = Console()
 
 _DOCTOR_REQUIRED_ROLES = (ModelRole.PLANNER, ModelRole.EXECUTOR, ModelRole.VERIFIER)
 _DOCTOR_SECRET_AUTH_MODES = {"api_key", "bearer", "x_api_key", "bedrock_api_key"}
 _DOCTOR_OPENAI_TYPES = {"openai_v1", "openai_compatible", "azure_foundry"}
 _DOCTOR_GOOGLE_TYPES = {"gemini", "vertex_ai"}
+@dataclass(slots=True)
+class _CommandEntry:
+    command: str
+    description: str
+    panel: str
+    kind: str
+
+
+def _command_help_text(info: Any) -> str:
+    callback = getattr(info, "callback", None)
+    if callback is None:
+        callback = getattr(info, "callback", None)
+    return (getattr(info, "help", None) or getattr(callback, "__doc__", None) or "").strip()
+
+
+def _normalize_panel(panel: str | None) -> str:
+    return panel or "Other"
+
+
+def _collect_command_entries(typer_app: typer.Typer, prefix: str = "", inherited_panel: str | None = None) -> list[_CommandEntry]:
+    entries: list[_CommandEntry] = []
+
+    for command_info in typer_app.registered_commands:
+        name = getattr(command_info, "name", None)
+        if not name:
+            continue
+        panel = _normalize_panel(getattr(command_info, "rich_help_panel", None) or inherited_panel)
+        entries.append(
+            _CommandEntry(
+                command=f"{prefix} {name}".strip(),
+                description=_command_help_text(command_info),
+                panel=panel,
+                kind="command",
+            )
+        )
+
+    for group_info in typer_app.registered_groups:
+        name = getattr(group_info, "name", None)
+        if not name:
+            continue
+        group_panel = _normalize_panel(getattr(group_info, "rich_help_panel", None) or inherited_panel)
+        group_command = f"{prefix} {name}".strip()
+        entries.append(
+            _CommandEntry(
+                command=group_command,
+                description=_command_help_text(group_info),
+                panel=group_panel,
+                kind="group",
+            )
+        )
+        nested = getattr(group_info, "typer_instance", None)
+        if nested is not None:
+            entries.extend(_collect_command_entries(nested, prefix=group_command, inherited_panel=group_panel))
+
+    return entries
+
+
+def _build_command_sections() -> dict[str, list[_CommandEntry]]:
+    sections: dict[str, list[_CommandEntry]] = {}
+    for entry in _collect_command_entries(app):
+        sections.setdefault(entry.panel, []).append(entry)
+    return sections
+
+
+def _render_command_tree(sections: dict[str, list[_CommandEntry]]) -> None:
+    for section, commands in sections.items():
+        table = Table(title=section)
+        table.add_column("Command", style="green")
+        table.add_column("Description")
+        for entry in sorted(commands, key=lambda item: item.command):
+            table.add_row(entry.command, entry.description)
+        console.print(table)
 
 
 def _doctor_is_local_host(host: str | None) -> bool:
@@ -176,14 +259,14 @@ def _doctor_context_ops() -> tuple[str, str]:
     return "PASS", "AICtx-backed ContextOps import and initialization ok"
 
 
-@app.command("config-dump", rich_help_panel="Advanced")
+@app.command("config-dump", rich_help_panel="Setup & Configuration")
 def config_dump(redacted: bool = typer.Option(True, "--redacted/--raw", help="Redact secrets in output.")) -> None:
     """Print loaded config."""
     config = load_team_config()
     console.print_json(json.dumps(config.dump(redacted=redacted)))
 
 
-@app.command("ping-models", rich_help_panel="Getting Started")
+@app.command("ping-models", rich_help_panel="Setup & Configuration")
 def ping_models() -> None:
     """Ping configured models with tiny deterministic request."""
     config = load_team_config()
@@ -566,7 +649,7 @@ def guided() -> None:
     run_guided_tui()
 
 
-@app.command("memory", rich_help_panel="Advanced")
+@app.command("memory", rich_help_panel="State & Integrations")
 def memory_cmd(
     action: str = typer.Argument(..., help="get|set|history|profile"),
     key: str = typer.Option(None, "--key", help="Preference key for get/set."),
@@ -610,7 +693,7 @@ def memory_cmd(
         raise typer.BadParameter(f"Unknown action: {action}")
 
 
-@app.command("doctor", rich_help_panel="Getting Started")
+@app.command("doctor", rich_help_panel="Setup & Configuration")
 def doctor_cmd(
     skip_connectivity: bool = typer.Option(False, "--skip-connectivity", help="Skip live model connectivity check."),
     oci: bool = typer.Option(False, "--oci", help="Include OCI readiness check."),
@@ -750,7 +833,7 @@ def doctor_cmd(
     console.print("[green]All checks passed.[/green]")
 
 
-@app.command("mcp-list", rich_help_panel="Advanced")
+@app.command("mcp-list", rich_help_panel="State & Integrations")
 def mcp_list_cmd(
     config: str = typer.Option(".ai-team/mcp.json", "--config", help="Path to MCP config file."),
 ) -> None:
@@ -787,7 +870,7 @@ def mcp_list_cmd(
     console.print(table)
 
 
-@app.command("mcp-call", rich_help_panel="Advanced")
+@app.command("mcp-call", rich_help_panel="State & Integrations")
 def mcp_call_cmd(
     tool_name: str = typer.Argument(..., help="MCP tool name (format: server.tool or just tool)."),
     args: list[str] = typer.Option([], "--arg", help="Key=value arguments."),
@@ -835,7 +918,7 @@ def mcp_call_cmd(
     raise typer.Exit(code=1)
 
 
-@app.command("desktop", rich_help_panel="Advanced")
+@app.command("desktop", rich_help_panel="State & Integrations")
 def desktop_cmd(
     port: int = typer.Option(8765, "--port", help="Port for the web server."),
     no_tray: bool = typer.Option(False, "--no-tray", help="Disable system tray icon."),
@@ -846,7 +929,7 @@ def desktop_cmd(
     run_desktop_app(port=port, use_tray=not no_tray)
 
 
-@app.command("copy", rich_help_panel="Advanced")
+@app.command("copy", rich_help_panel="State & Integrations")
 def copy_cmd(
     source: str = typer.Argument(..., help="Source path within workspace."),
     destination: str = typer.Argument(..., help="Destination path within workspace."),
@@ -883,6 +966,30 @@ def copy_cmd(
     else:
         console.print(f"[red]Error:[/red] {result.error}")
         raise typer.Exit(code=1)
+
+
+@app.command("commands", rich_help_panel="State & Integrations")
+def commands_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Emit the full command tree as JSON."),
+) -> None:
+    """Print the full flattened command tree."""
+    sections = _build_command_sections()
+    if as_json:
+        payload = {
+            "sections": [
+                {
+                    "name": section,
+                    "commands": [asdict(entry) for entry in sorted(entries, key=lambda item: item.command)],
+                }
+                for section, entries in sections.items()
+            ]
+        }
+        console.print_json(json.dumps(payload))
+        return
+
+    console.print("[bold]Agentheim command tree[/bold]")
+    console.print("Use `agentheim <group> --help` for option details on any branch.\n")
+    _render_command_tree(sections)
 
 
 def main() -> None:

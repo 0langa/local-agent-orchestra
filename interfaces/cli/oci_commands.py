@@ -88,7 +88,7 @@ def oci_doctor_cmd(
 
 
 snapshot_app = typer.Typer(help="Snapshot commands.")
-oci_app.add_typer(snapshot_app, name="snapshot")
+oci_app.add_typer(snapshot_app, name="snapshot", help="Snapshot commands: create, verify.")
 
 
 @snapshot_app.command("create")
@@ -156,7 +156,7 @@ def snapshot_verify_cmd(
 
 
 bundle_app = typer.Typer(help="Bundle commands.")
-oci_app.add_typer(bundle_app, name="bundle")
+oci_app.add_typer(bundle_app, name="bundle", help="Bundle commands: create, verify.")
 
 
 @bundle_app.command("create")
